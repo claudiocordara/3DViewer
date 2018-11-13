@@ -23,7 +23,9 @@
     <ClCompile Include="GeneratedFiles\Debug\moc_mainWindow.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mainWindow.cpp" />
-    <ClCompile Include="scene3d.cpp" />
+    <ClCompile Include="scene3d.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="functions.h" />
