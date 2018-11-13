@@ -398,11 +398,6 @@ int Scene3D::getSkeleton()
 		SkelVertex[3 * i + 1] = (skeleton[v].point.y() - cy) * asp;
 		SkelVertex[3 * i + 2] = (skeleton[v].point.z() - cz) * asp;
 		
-		// add vertex colors to array of edge's colors
-		SkelColor[4 * i] = 0.0f;
-		SkelColor[4 * i + 1] = 0.0f;
-		SkelColor[4 * i + 2] = 0.75f;
-		SkelColor[4 * i + 3] = 1.00f;
 		SkelSegVert[i] = -1;
 		i++;
 	}
@@ -429,6 +424,38 @@ int Scene3D::getSkeleton()
 	// get the number of unjoined skeleton's parts
 	int maxSeg = (int)SegGroups.size();
 	maxgroup = SegGroups[maxSeg - 1];
+
+	// resize the segments colors array
+	SkelSegmColors = new GLfloat[3 * maxSeg];
+	// loop over segments
+	for (i = 0; i < maxSeg; i++) {
+		int mainCol = i % 3;
+		// fill the colors with random (except of blue)
+		SkelSegmColors[3 * i] = 0.05f + 0.01f * (qrand() % 15);
+		SkelSegmColors[3 * i + 1] = 0.05f + 0.01f * (qrand() % 15);
+		SkelSegmColors[3 * i + 2] = 0.05f + 0.01f * (qrand() % 15);
+		SkelSegmColors[3 * i + mainCol] += 0.75f;
+	}
+
+	switchColors();
+	/*
+	// loop over skeleton's vertices
+	for (i = 0; i < vskel; i++) {
+		
+		// blue color by default for skeleton
+		GLfloat R = 0.0f, G = 0.0f, B = 0.75f;
+		if (showElem & shColors) {
+			R = SkelSegmColors[3 * SkelSegVert[i]];
+			G = SkelSegmColors[3 * SkelSegVert[i] + 1];
+			B = SkelSegmColors[3 * SkelSegVert[i] + 2];
+		}
+		// add vertex colors to array of edge's colors
+		SkelColor[4 * i] = R;
+		SkelColor[4 * i + 1] = G;
+		SkelColor[4 * i + 2] = B;
+		SkelColor[4 * i + 3] = 1.00f;
+	}*/
+
 	// loop over unjoined parts; try to find the parts which can be joined
 	while (maxgroup > 0)
 	{
@@ -503,6 +530,48 @@ int Scene3D::getSkeleton()
 	
 	// return the number of unjoined parts: zero is normal return
 	return maxgroup;
+}
+
+// Switch segments colors between random and fixed
+void Scene3D::switchColors()
+{
+	// check do the skeleton exist
+	if (vskel == 0) return;
+
+	// loop over skeleton's vertices
+	for (int i = 0; i < vskel; i++) {
+
+		// blue color by default for skeleton
+		GLfloat R = 0.0f, G = 0.0f, B = 0.75f;
+		// set the different colors to segments if checked
+		if (showElem & shColors) {
+			R = SkelSegmColors[3 * SkelSegVert[i]];
+			G = SkelSegmColors[3 * SkelSegVert[i] + 1];
+			B = SkelSegmColors[3 * SkelSegVert[i] + 2];
+		}
+		// add vertex colors to array of edge's colors
+		SkelColor[4 * i] = R;
+		SkelColor[4 * i + 1] = G;
+		SkelColor[4 * i + 2] = B;
+		SkelColor[4 * i + 3] = 1.00f;
+	}
+
+	// loop over mesh vertices
+	for (int i = 0; i < vmesh; i++) {
+		// light-green transparent color by default
+		GLfloat R = 0.5f, G = 0.7f, B = 0.5f, T = 0.3f;
+		if (showElem & shColors) {
+			R = SkelSegmColors[3 * SkelSegVert[SkelMapMesh[i]]];
+			G = SkelSegmColors[3 * SkelSegVert[SkelMapMesh[i]] + 1];
+			B = SkelSegmColors[3 * SkelSegVert[SkelMapMesh[i]] + 2];
+			T = 1.0f;
+		}
+		// add vertex colors to array of facets colors
+		MeshColor[4 * i] = R;
+		MeshColor[4 * i + 1] = G;
+		MeshColor[4 * i + 2] = B;
+		MeshColor[4 * i + 3] = T;
+	}
 }
 
 // Extract the new segment from solid

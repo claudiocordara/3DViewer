@@ -78,6 +78,12 @@ MainWindow::MainWindow()
 	action->setChecked(false);
 	action->setEnabled(false);
 	connect(action, &QAction::toggled, this, &MainWindow::setDockOptions);
+	// create the checker for colored segments
+	action = menuOptions->addAction(tr("Colored segments"));
+	action->setCheckable(true);
+	action->setChecked(false);
+	action->setEnabled(false);
+	connect(action, &QAction::toggled, this, &MainWindow::setDockOptions);
 }
 
 // Open the STL and OFF files
@@ -139,11 +145,13 @@ void MainWindow::Skeleton()
 {
 	// call the method of Scene3D (see header)
 	int mGroup = createSkeleton();
-	// change the statement of 'Skeleton' checker
+	// change the statement of 'Skeleton' and 'Colored segments' checker
 	QList<QAction*> actions = menuOptions->actions();
 	actions.at(1)->setChecked(true);
 	actions.at(1)->setEnabled(true);
-	
+	actions.at(5)->setChecked(false);
+	actions.at(5)->setEnabled(true);
+
 	// disable the 'Create Skeleton' item
 	actions = menuActions->actions();
 	actions.at(0)->setEnabled(false);
@@ -318,7 +326,13 @@ void MainWindow::setDockOptions()
 	// set the mask of 'Parts' item
 	if (actions.at(4)->isChecked())
 		widget->showElem |= shParts;
-	
+	// set the mask of 'Colored segments' item
+	if (actions.at(5)->isChecked())
+		widget->showElem |= shColors;
+
+	// set the colors (to apply 'Colored segments' item)
+	sColors();
+
 	// update the showed elements
 	widget->update();
 }

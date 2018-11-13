@@ -37,7 +37,7 @@ private:
 	int fpart;					// the number of parts facets
 	int vskel;					// the number of skeleton vertices
 	int eskel;					// the number of skeleton edges
-	int maxgroup;				// the number of skeleton's segments
+	int maxgroup;				// the number of skeleton's unjoined groups
 
 	GLfloat asp;				// aspect ratio to set the maximum distance from mesh surface to origin equal to one
 	// shifts to set the center of mesh on the point of origin
@@ -52,6 +52,7 @@ private:
 	GLfloat *EdgeColor;			// array of solid's colors of vertices (for edges)
 	GLuint *EdgeIndex;			// array of solid's edges
 	GLfloat *SkelVertex;		// array of skeleton's vertices
+	GLfloat *SkelSegmColors;	// array of skeleton's random colors of segments
 	GLfloat *SkelColor;			// array of skeleton's colors of vertices (for edges)
 	GLuint *SkelIndex;			// array of skeleton's edges
 	GLint *SkelSegVert;			// array of skeleton's relations vertex<->segment
@@ -117,6 +118,7 @@ public:
 		updateGL();
 	}
 	int getSkeleton();
+	void switchColors();
 	void getParts();
 	void newPart();
 	void groupsToOff();

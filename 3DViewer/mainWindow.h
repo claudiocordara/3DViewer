@@ -7,6 +7,7 @@
 #define shWireframe 0x04
 #define shFacets 0x08
 #define shParts 0x10
+#define shColors 0x20
 
 #include <QMainWindow>
 #include "scene3d.h"
@@ -31,6 +32,7 @@ public:
 	void sGroups();
 	void nPart();
 	int createSkeleton() { return widget->getSkeleton(); }
+	void sColors() { widget->switchColors(); }
 	void saveGroups() { widget->groupsToOff(); }
 	void setFigureOn();
 	void setDockOptions();
