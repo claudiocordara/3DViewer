@@ -8,6 +8,8 @@
 #define shFacets 0x08
 #define shParts 0x10
 #define shColors 0x20
+#define segColors 0x40
+#define sdfColors 0x80
 
 #include <QMainWindow>
 #include "scene3d.h"
@@ -23,6 +25,7 @@ public:
 	Scene3D * widget;		// Qt widget to show the 3D objects
 	QMenu * menuActions;	// 'Process' menu
 	QMenu * menuOptions;	// 'Elements' menu
+	QMenu * menuTest;
 	private slots:
 	void openModel();
 	void addPart();
@@ -35,7 +38,13 @@ public:
 	void sColors() { widget->switchColors(); }
 	void saveGroups() { widget->groupsToOff(); }
 	void setFigureOn();
+
 	void setDockOptions();
+	void setDockOptions1();
+	void setDockOptions2();
+	void setDockOptions3();
+
 	void keyPressEvent(QKeyEvent* pe) { return widget->keyPressEvent(pe); }
+	int TestSegmentation();
 };
 #endif

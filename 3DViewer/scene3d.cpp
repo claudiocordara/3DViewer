@@ -238,6 +238,8 @@ void Scene3D::getMesh()
 	EdgeColor = new GLfloat[4 * vmesh];
 	EdgeIndex = new GLuint[6 * fmesh];
 	SkelMapMesh = new GLuint[vmesh];
+	MeshColorSDF = new GLfloat[4 * vmesh];
+	MeshColorSeg = new GLfloat[4 * vmesh];
 
 	// loop over vertices
 	int i = 0;
@@ -254,6 +256,11 @@ void Scene3D::getMesh()
 		MeshColor[4 * i + 1] = 0.7f;
 		MeshColor[4 * i + 2] = 0.5f;
 		MeshColor[4 * i + 3] = 0.3f;
+
+		MeshColorSDF[4 * i] = 0.5f;
+		MeshColorSDF[4 * i + 1] = 0.7f;
+		MeshColorSDF[4 * i + 2] = 0.5f;
+		MeshColorSDF[4 * i + 3] = 0.3f;
 
 		// add vertex color to array of edges colors
 		EdgeColor[4 * i] = 0.25f;
@@ -536,7 +543,7 @@ int Scene3D::getSkeleton()
 void Scene3D::switchColors()
 {
 	// check do the skeleton exist
-	if (vskel == 0) return;
+	//if (vskel == 0) return;
 
 	// loop over skeleton's vertices
 	for (int i = 0; i < vskel; i++) {
@@ -566,6 +573,19 @@ void Scene3D::switchColors()
 			B = SkelSegmColors[3 * SkelSegVert[SkelMapMesh[i]] + 2];
 			T = 1.0f;
 		}
+		else if (showElem & segColors) {
+			R = MeshColorSeg[4 * i];
+			G = MeshColorSeg[4 * i + 1];
+			B = MeshColorSeg[4 * i + 2];
+			T = MeshColorSeg[4 * i + 3];
+		}
+		else if (showElem & sdfColors) {
+			R = MeshColorSDF[4 * i];
+			G = MeshColorSDF[4 * i + 1];
+			B = MeshColorSDF[4 * i + 2];
+			T = MeshColorSDF[4 * i + 3];
+		}
+
 		// add vertex colors to array of facets colors
 		MeshColor[4 * i] = R;
 		MeshColor[4 * i + 1] = G;
@@ -1108,4 +1128,165 @@ void Scene3D::add(Polyhedron mesh)
 	getMesh();
 	// calculate the parts arrays
 	getParts();
+}
+
+
+int Scene3D::testSegmentation() {
+	int ret = EXIT_FAILURE;
+	if (tmesh.size() == 1) {
+		Polyhedron mesh = tmesh[0];
+
+		// Segmentation via sdf values
+		//// create a property-map for segment-ids
+		//typedef std::map<Polyhedron::Facet_const_handle, std::size_t> Facet_int_map;
+		//Facet_int_map internal_segment_map;
+		//boost::associative_property_map<Facet_int_map> segment_property_map(internal_segment_map);
+
+		//// calculate SDF values and segment the mesh using default parameters.
+		//std::size_t number_of_segments = CGAL::segmentation_via_sdf_values(mesh, segment_property_map);
+
+		//std::cout << "Number of segments: " << number_of_segments << std::endl;
+
+
+
+		// Segmentation from sdf values
+		// create a property-map for SDF values
+		typedef std::map<Polyhedron::Facet_const_handle, double> Facet_double_map;
+		Facet_double_map internal_sdf_map;
+		boost::associative_property_map<Facet_double_map> sdf_property_map(internal_sdf_map);
+		// compute SDF values using default parameters for number of rays, and cone angle
+
+
+		CGAL::sdf_values(	mesh, 
+							sdf_property_map,
+							2.0 / 3.0 * CGAL_PI,	// double cone_angle = 2.0 / 3.0 * CGAL_PI
+							25,						// std::size_t number_of_rays = 25
+							true					// bool postprocess = true
+						);
+
+
+		for (Polyhedron::Facet_iterator facet_it = mesh.facets_begin(); facet_it != mesh.facets_end(); ++facet_it) {
+			//std::cout << sdf_property_map[facet_it] << " ";
+			GLfloat R = 0.5f, G = 0.7f, B = 0.5f, T = 0.3f;
+			double value = sdf_property_map[facet_it];
+			if (0 <= value && value <= 1.0 / 8.0) {
+				R = 0.0;
+				G = 0.0;
+				B = 4.0 * value + .5; // .5 - 1 // b = 1/2
+			}
+			else if (1.0 / 8.0 < value && value <= 3.0 / 8.0) {
+				R = 0.0;
+				G = 4.0 * value - .5; // 0 - 1 // b = - 1/2
+				B = 1.0; // small fix
+			}
+			else if (3.0 / 8.0 < value && value <= 5.0 / 8.0) {
+				R = 4.0 * value - 1.5; // 0 - 1 // b = - 3/2
+				G = 1.0;
+				B = -4.0 * value + 2.5; // 1 - 0 // b = 5/2
+			}
+			else if (5.0 / 8.0 < value && value <= 7.0 / 8.0) {
+				R = 1.0;
+				G = -4.0 * value + 3.5; // 1 - 0 // b = 7/2
+				B = 0.0;
+			}
+			else if (7.0 / 8.0 < value && value <= 1.0) {
+				R = -4.0 * value + 4.5; // 1 - .5 // b = 9/2
+				G = 0.0;
+				B = 0.0;
+			}
+			else {    // should never happen - value > 1
+				R = .5;
+				G = 0;
+				B = 0;
+			}
+			T = 1.0;
+
+			Halfedge_facet_circulator j = facet_it->facet_begin();
+			// Facets in polyhedral surfaces are at least triangles.
+			CGAL_assertion(CGAL::circulator_size(j) >= 3);
+			std::cout << CGAL::circulator_size(j) << ' ';
+			do {
+				int vIndex = std::distance(mesh.vertices_begin(), j->vertex());
+				//std::cout << ' ' << std::distance(P.vertices_begin(), j->vertex());
+
+				MeshColorSDF[4 * vIndex] = R;
+				MeshColorSDF[4 * vIndex + 1] = G;
+				MeshColorSDF[4 * vIndex + 2] = B;
+				MeshColorSDF[4 * vIndex + 3] = T;
+
+			} while (++j != facet_it->facet_begin());
+		}
+
+
+
+		// create a property-map for segment-ids
+		typedef std::map<Polyhedron::Facet_const_handle, std::size_t> Facet_int_map;
+		Facet_int_map internal_segment_map;
+		boost::associative_property_map<Facet_int_map> segment_property_map(internal_segment_map);
+		// segment the mesh using default parameters for number of levels, and smoothing lambda
+		// Any other scalar values can be used instead of using SDF values computed using the CGAL function
+
+
+		std::size_t number_of_segments = CGAL::segmentation_from_sdf_values(	mesh,
+																				sdf_property_map,
+																				segment_property_map,
+																				5,							// std::size_t number_of_clusters = 5
+																				0.26,						// double smoothing_lambda = 0.26
+																				false						// bool output_cluster_ids = false
+																			);
+		std::cout << "Number of segments: " << number_of_segments << std::endl;
+
+
+
+
+		if (SkelSegmColors != NULL) {
+			delete SkelSegmColors;
+		}
+		SkelSegmColors = new GLfloat[3 * number_of_segments];
+		// loop over segments
+		for (int i = 0; i < number_of_segments; i++) {
+			int mainCol = i % 3;
+			// fill the colors with random (except of blue)
+			SkelSegmColors[3 * i] = 0.05f + 0.01f * (qrand() % 15);
+			SkelSegmColors[3 * i + 1] = 0.05f + 0.01f * (qrand() % 15);
+			SkelSegmColors[3 * i + 2] = 0.05f + 0.01f * (qrand() % 15);
+			SkelSegmColors[3 * i + mainCol] += 0.75f;
+		}
+
+
+		// print segment-ids
+
+		for (Polyhedron::Facet_iterator facet_it = mesh.facets_begin();
+			facet_it != mesh.facets_end(); ++facet_it) {
+			std::cout << segment_property_map[facet_it] << " ";
+
+			GLfloat R = 0.5f, G = 0.7f, B = 0.5f, T = 0.3f;
+			// set the different colors to segments if checked
+			R = SkelSegmColors[3 * segment_property_map[facet_it]];
+			G = SkelSegmColors[3 * segment_property_map[facet_it] + 1];
+			B = SkelSegmColors[3 * segment_property_map[facet_it] + 2];
+			T = 1.0;
+
+			Halfedge_facet_circulator j = facet_it->facet_begin();
+			// Facets in polyhedral surfaces are at least triangles.
+			CGAL_assertion(CGAL::circulator_size(j) >= 3);
+			std::cout << CGAL::circulator_size(j) << ' ';
+			do {
+				int vIndex = std::distance(mesh.vertices_begin(), j->vertex());
+				//std::cout << ' ' << std::distance(P.vertices_begin(), j->vertex());
+
+				MeshColorSeg[4 * vIndex] = R;
+				MeshColorSeg[4 * vIndex + 1] = G;
+				MeshColorSeg[4 * vIndex + 2] = B;
+				MeshColorSeg[4 * vIndex + 3] = T;
+
+			} while (++j != facet_it->facet_begin());
+
+		}
+		std::cout << std::endl;
+
+		ret = EXIT_SUCCESS;
+	}
+
+	return ret;
 }

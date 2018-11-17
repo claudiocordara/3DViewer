@@ -19,6 +19,7 @@ typedef Kernel::Point_3													Point;
 typedef CGAL::Polyhedron_3<Kernel, CGAL::Polyhedron_items_with_id_3>	Polyhedron;
 typedef Polyhedron::Facet_iterator										Facet_iterator;
 typedef Polyhedron::Halfedge_around_facet_circulator					Halfedge_facet_circulator;
+typedef Polyhedron::Halfedge_around_facet_const_circulator				Halfedge_facet_const_circulator;
 typedef boost::graph_traits<Polyhedron>::vertex_descriptor				vertex_descriptor;
 
 // Scene3D class to 3D objects visualization using Qt
@@ -47,7 +48,11 @@ private:
 	QPoint ptrMousePosition;	// the last saved mouse position
 
 	GLfloat *MeshVertex;		// array of solid's vertices
+
 	GLfloat *MeshColor;			// array of solid's colors of vertices (for facets)
+	GLfloat *MeshColorSeg;		// array of solid's colors of vertices (for facets)
+	GLfloat *MeshColorSDF;		// array of solid's colors of vertices (for facets)
+
 	GLuint *MeshIndex;			// array of solid's facets
 	GLfloat *EdgeColor;			// array of solid's colors of vertices (for edges)
 	GLuint *EdgeIndex;			// array of solid's edges
@@ -124,5 +129,6 @@ public:
 	void groupsToOff();
 	void drawParts();
 	void drawPWireframe();
+	int testSegmentation();
 };
 #endif

@@ -78,12 +78,27 @@ MainWindow::MainWindow()
 	action->setChecked(false);
 	action->setEnabled(false);
 	connect(action, &QAction::toggled, this, &MainWindow::setDockOptions);
+
 	// create the checker for colored segments
 	action = menuOptions->addAction(tr("Colored segments"));
 	action->setCheckable(true);
 	action->setChecked(false);
 	action->setEnabled(false);
-	connect(action, &QAction::toggled, this, &MainWindow::setDockOptions);
+	connect(action, &QAction::toggled, this, &MainWindow::setDockOptions1);
+	action = menuOptions->addAction(tr("Colored segments test"));
+	action->setCheckable(true);
+	action->setChecked(false);
+	action->setEnabled(false);
+	connect(action, &QAction::toggled, this, &MainWindow::setDockOptions2);
+	action = menuOptions->addAction(tr("Colored sdf"));
+	action->setCheckable(true);
+	action->setChecked(false);
+	action->setEnabled(false);
+	connect(action, &QAction::toggled, this, &MainWindow::setDockOptions3);
+
+
+	menuTest = menuBar()->addMenu(tr("Test"));
+	action = menuTest->addAction(tr("Segmentation"), this, &MainWindow::TestSegmentation);
 }
 
 // Open the STL and OFF files
@@ -327,12 +342,63 @@ void MainWindow::setDockOptions()
 	if (actions.at(4)->isChecked())
 		widget->showElem |= shParts;
 	// set the mask of 'Colored segments' item
-	if (actions.at(5)->isChecked())
+	if (actions.at(5)->isChecked()) {
 		widget->showElem |= shColors;
+		widget->showElem &= ~segColors;
+		widget->showElem &= ~sdfColors;
+	}
+	if (actions.at(6)->isChecked()) {
+		int ntshColors = ~shColors;
+		widget->showElem &= ~shColors;
+		widget->showElem |= segColors;
+		widget->showElem &= ~sdfColors;
+	}
+	if (actions.at(7)->isChecked()) {
+		widget->showElem &= ~shColors;
+		widget->showElem &= ~segColors;
+		widget->showElem |= sdfColors;
+	}
 
 	// set the colors (to apply 'Colored segments' item)
 	sColors();
 
 	// update the showed elements
 	widget->update();
+}
+
+void MainWindow::setDockOptions1() {
+	QList<QAction*> actions = menuOptions->actions();
+	if (actions.at(5)->isChecked()) {
+		actions.at(6)->setChecked(false);
+		actions.at(7)->setChecked(false);
+		setDockOptions();
+	}
+}
+void MainWindow::setDockOptions2() {
+	QList<QAction*> actions = menuOptions->actions();
+	if (actions.at(6)->isChecked()) {
+		actions.at(5)->setChecked(false);
+		actions.at(7)->setChecked(false);
+		setDockOptions();
+	}
+}
+void MainWindow::setDockOptions3() {
+	QList<QAction*> actions = menuOptions->actions();
+	if (actions.at(7)->isChecked()) {
+		actions.at(5)->setChecked(false);
+		actions.at(6)->setChecked(false);
+		setDockOptions();
+	}
+}
+
+
+
+int MainWindow::TestSegmentation() {
+	int ret = widget->testSegmentation();
+	if (ret == EXIT_SUCCESS) {
+		QList<QAction*> actions = menuOptions->actions();
+		actions.at(6)->setEnabled(true);
+		actions.at(7)->setEnabled(true);
+	}
+	return ret;
 }
