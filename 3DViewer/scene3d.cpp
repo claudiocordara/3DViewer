@@ -12,6 +12,11 @@ typedef Skeletonization::Skeleton										Skeleton;
 typedef Skeleton::vertex_descriptor										Skeleton_vertex;
 typedef Skeleton::edge_descriptor										Skeleton_edge;
 
+
+typedef boost::graph_traits<Polyhedron>::vertex_descriptor           vertex_descriptor;
+typedef boost::graph_traits<Polyhedron>::halfedge_descriptor         halfedge_descriptor;
+typedef boost::graph_traits<Polyhedron>::face_descriptor             face_descriptor;
+
 // Initiation of Scene3D object
 Scene3D::Scene3D(QWidget* parent) : QGLWidget(parent)
 {
@@ -543,7 +548,7 @@ int Scene3D::getSkeleton()
 void Scene3D::switchColors()
 {
 	// check do the skeleton exist
-	//if (vskel == 0) return;
+	if (vskel == 0) return;
 
 	// loop over skeleton's vertices
 	for (int i = 0; i < vskel; i++) {
@@ -592,6 +597,112 @@ void Scene3D::switchColors()
 		MeshColor[4 * i + 2] = B;
 		MeshColor[4 * i + 3] = T;
 	}
+}
+
+
+
+bool Scene3D::splitParts() {
+	std::vector<std::vector<double> > partsCoords;
+	std::vector<std::vector<int> > pTris;			// part's facets
+	std::vector<std::vector<int> > pVert;			// part's vertices (relation to old indices)
+
+	std::vector<std::array<int32_t, 3>> segs = GetAllSeg(vskel, eskel, SkelSegEdge, SkelSegVert);
+	//std::vector<int> mVert;			// main vertices (relation to old indices)
+
+	bool ret = false;
+
+	if (segs.empty() == false && segs[0][0] != -1) {
+		ret = true;
+
+		partsCoords.reserve(segs.size());
+		for (int i = 0; i < (int)segs.size(); i++) {
+			for (int j = 0; j < vmesh + 1; j++) {
+				// initiate the arrays of indices relations 
+				pVert[i].push_back(-1);
+				//mVert.push_back(-1);
+			}
+		}
+
+		for (int i = 0 ; i < (int)segs.size() ; i++) {
+			for (int v = 0; v < 3; v++) {
+				partsCoords[i].push_back(SkelVertex[3 * segs[i][1] + v]);
+			}
+		}
+
+		int pvert = 1;
+		int mvert = 1;
+
+
+		for (int j = 0; j < fmesh && ret == true ; j++) {
+			int segIdVertex0 = SkelSegVert[SkelMapMesh[MeshIndex[3 * j]]];
+			int segIdVertex1 = SkelSegVert[SkelMapMesh[MeshIndex[3 * j + 1]]];
+			int segIdVertex2 = SkelSegVert[SkelMapMesh[MeshIndex[3 * j + 2]]];
+			int segIdFace = -1;
+			if (segIdVertex0 == segIdVertex1 || segIdVertex0 == segIdVertex2) {
+				segIdFace = segIdVertex0;
+			}
+			else if (segIdVertex1 == segIdVertex0 || segIdVertex1 == segIdVertex2) {
+				segIdFace = segIdVertex1;
+			}
+			else if (segIdVertex2 == segIdVertex0 || segIdVertex2 == segIdVertex1) {
+				segIdFace = segIdVertex2;
+			}
+
+			if (segIdFace != -1) {
+				int segNdx = -1;
+				for (int j = 0; j < (int)segs.size() && segNdx == -1 ; j++) {
+					if (segIdFace == segs[j][0]) {
+						segNdx = j;
+					}
+				}
+				if (segNdx != -1) {
+					// loop over facet's vertices
+					for (int v = 0; v < 3; v++) {
+						// get the index of current vertex
+						int vn = MeshIndex[3 * j + v];
+						// it was not saved in array yet
+						if (pVert[segNdx][vn] == -1)
+						{
+							// add the relation between solid's and part's indices
+							pVert[segNdx][vn] = pvert++;
+							// add the coordinates to part's array
+							
+
+							partsCoords[segNdx].push_back(MeshVertex[3 * vn]);
+							partsCoords[segNdx].push_back(MeshVertex[3 * vn + 1]);
+							partsCoords[segNdx].push_back(MeshVertex[3 * vn + 2]);
+						}
+						// add the new index to part's array
+						pTris[segNdx].push_back(pVert[segNdx][vn]);
+					}
+				}
+				else {
+					ret = false;
+				}
+			}
+			else {
+				ret = false;
+			}
+		}
+
+
+		try {
+			for (int i = 0; i < (int)segs.size(); i++) {
+				Polyhedron part = arrToMesh(partsCoords[i], pTris[i]);
+				segMesh.push_back(part);
+			}
+		}
+		catch (const CGAL::Assertion_exception e) { // the extracted vertices and facets don't form a proper mesh
+			// create the error message
+			QMessageBox msg;
+			msg.setText("The part extraction was unsuccessful, please reopen the model and try again");
+			msg.setStandardButtons(QMessageBox::Ok);
+			msg.setDefaultButton(QMessageBox::Ok);
+			msg.exec();
+		}
+	}
+
+	return ret;
 }
 
 // Extract the new segment from solid
@@ -1131,7 +1242,7 @@ void Scene3D::add(Polyhedron mesh)
 }
 
 
-int Scene3D::testSegmentation() {
+int Scene3D::testSegmentationBySDF() {
 	int ret = EXIT_FAILURE;
 	if (tmesh.size() == 1) {
 		Polyhedron mesh = tmesh[0];
@@ -1288,5 +1399,208 @@ int Scene3D::testSegmentation() {
 		ret = EXIT_SUCCESS;
 	}
 
+	return ret;
+}
+
+// Property map associating a facet with an integer as id to an
+// element in a vector stored internally
+template<class ValueType>
+struct Facet_with_id_pmap
+	: public boost::put_get_helper<ValueType&,
+	Facet_with_id_pmap<ValueType> >
+{
+	typedef face_descriptor key_type;
+	typedef ValueType value_type;
+	typedef value_type& reference;
+	typedef boost::lvalue_property_map_tag category;
+	Facet_with_id_pmap(
+		std::vector<ValueType>& internal_vector
+	) : internal_vector(internal_vector) { }
+	reference operator[](key_type key) const
+	{
+		return internal_vector[key->id()];
+	}
+private:
+	std::vector<ValueType>& internal_vector;
+};
+
+
+int Scene3D::testSegmentationBySkeleton() {
+	int ret = EXIT_FAILURE;
+	if (tmesh.size() == 1) {
+		Polyhedron mesh = tmesh[0];
+		// extract the skeleton
+		Skeleton skeleton;
+		CGAL::extract_mean_curvature_flow_skeleton(mesh, skeleton);
+		// init the polyhedron simplex indices
+		CGAL::set_halfedgeds_items_id(mesh);
+		//for each input vertex compute its distance to the skeleton
+		std::vector<double> distances(num_vertices(mesh));
+		BOOST_FOREACH(Skeleton_vertex v, vertices(skeleton))
+		{
+			const Point& skel_pt = skeleton[v].point;
+			BOOST_FOREACH(vertex_descriptor mesh_v, skeleton[v].vertices)
+			{
+				const Point& mesh_pt = mesh_v->point();
+				distances[mesh_v->id()] = std::sqrt(CGAL::squared_distance(skel_pt, mesh_pt));
+			}
+		}
+		// create a property-map for sdf values
+		std::vector<double> sdf_values(num_faces(mesh));
+		Facet_with_id_pmap<double> sdf_property_map(sdf_values);
+		// compute sdf values with skeleton
+		BOOST_FOREACH(face_descriptor f, faces(mesh))
+		{
+			double dist = 0;
+			BOOST_FOREACH(halfedge_descriptor hd, halfedges_around_face(halfedge(f, mesh), mesh))
+				dist += distances[target(hd, mesh)->id()];
+			sdf_property_map[f] = dist / 3.;
+		}
+		// post-process the sdf values
+		CGAL::sdf_values_postprocessing(mesh, sdf_property_map);
+
+		for (Polyhedron::Facet_iterator facet_it = mesh.facets_begin(); facet_it != mesh.facets_end(); ++facet_it) {
+			//std::cout << sdf_property_map[facet_it] << " ";
+			GLfloat R = 0.5f, G = 0.7f, B = 0.5f, T = 0.3f;
+			double value = sdf_property_map[facet_it];
+			if (0 <= value && value <= 1.0 / 8.0) {
+				R = 0.0;
+				G = 0.0;
+				B = 4.0 * value + .5; // .5 - 1 // b = 1/2
+			}
+			else if (1.0 / 8.0 < value && value <= 3.0 / 8.0) {
+				R = 0.0;
+				G = 4.0 * value - .5; // 0 - 1 // b = - 1/2
+				B = 1.0; // small fix
+			}
+			else if (3.0 / 8.0 < value && value <= 5.0 / 8.0) {
+				R = 4.0 * value - 1.5; // 0 - 1 // b = - 3/2
+				G = 1.0;
+				B = -4.0 * value + 2.5; // 1 - 0 // b = 5/2
+			}
+			else if (5.0 / 8.0 < value && value <= 7.0 / 8.0) {
+				R = 1.0;
+				G = -4.0 * value + 3.5; // 1 - 0 // b = 7/2
+				B = 0.0;
+			}
+			else if (7.0 / 8.0 < value && value <= 1.0) {
+				R = -4.0 * value + 4.5; // 1 - .5 // b = 9/2
+				G = 0.0;
+				B = 0.0;
+			}
+			else {    // should never happen - value > 1
+				R = .5;
+				G = 0;
+				B = 0;
+			}
+			T = 1.0;
+
+			Halfedge_facet_circulator j = facet_it->facet_begin();
+			// Facets in polyhedral surfaces are at least triangles.
+			CGAL_assertion(CGAL::circulator_size(j) >= 3);
+			std::cout << CGAL::circulator_size(j) << ' ';
+			do {
+				int vIndex = std::distance(mesh.vertices_begin(), j->vertex());
+				//std::cout << ' ' << std::distance(P.vertices_begin(), j->vertex());
+
+				MeshColorSDF[4 * vIndex] = R;
+				MeshColorSDF[4 * vIndex + 1] = G;
+				MeshColorSDF[4 * vIndex + 2] = B;
+				MeshColorSDF[4 * vIndex + 3] = T;
+
+			} while (++j != facet_it->facet_begin());
+		}
+
+		// create a property-map for segment-ids (it is an adaptor for this case)
+		std::vector<std::size_t> segment_ids(num_faces(mesh));
+		Facet_with_id_pmap<std::size_t> segment_property_map(segment_ids);
+		// segment the mesh using default parameters
+		std::size_t number_of_segments = CGAL::segmentation_from_sdf_values(mesh, sdf_property_map, segment_property_map);
+
+
+		if (SkelSegmColors != NULL) {
+			delete SkelSegmColors;
+		}
+		SkelSegmColors = new GLfloat[3 * number_of_segments];
+		// loop over segments
+		for (int i = 0; i < number_of_segments; i++) {
+			int mainCol = i % 3;
+			// fill the colors with random (except of blue)
+			SkelSegmColors[3 * i] = 0.05f + 0.01f * (qrand() % 15);
+			SkelSegmColors[3 * i + 1] = 0.05f + 0.01f * (qrand() % 15);
+			SkelSegmColors[3 * i + 2] = 0.05f + 0.01f * (qrand() % 15);
+			SkelSegmColors[3 * i + mainCol] += 0.75f;
+		}
+
+
+		// print segment-ids
+
+		for (Polyhedron::Facet_iterator facet_it = mesh.facets_begin();
+			facet_it != mesh.facets_end(); ++facet_it) {
+			std::cout << segment_property_map[facet_it] << " ";
+
+			GLfloat R = 0.5f, G = 0.7f, B = 0.5f, T = 0.3f;
+			// set the different colors to segments if checked
+			R = SkelSegmColors[3 * segment_property_map[facet_it]];
+			G = SkelSegmColors[3 * segment_property_map[facet_it] + 1];
+			B = SkelSegmColors[3 * segment_property_map[facet_it] + 2];
+			T = 1.0;
+
+			Halfedge_facet_circulator j = facet_it->facet_begin();
+			// Facets in polyhedral surfaces are at least triangles.
+			CGAL_assertion(CGAL::circulator_size(j) >= 3);
+			std::cout << CGAL::circulator_size(j) << ' ';
+			do {
+				int vIndex = std::distance(mesh.vertices_begin(), j->vertex());
+				//std::cout << ' ' << std::distance(P.vertices_begin(), j->vertex());
+
+				MeshColorSeg[4 * vIndex] = R;
+				MeshColorSeg[4 * vIndex + 1] = G;
+				MeshColorSeg[4 * vIndex + 2] = B;
+				MeshColorSeg[4 * vIndex + 3] = T;
+
+			} while (++j != facet_it->facet_begin());
+		}
+		ret = EXIT_SUCCESS;
+	}
+	return ret;
+}
+
+typedef CGAL::Exact_predicates_exact_constructions_kernel Kernel1;
+typedef CGAL::Polyhedron_3<Kernel1> Polyhedron_3;
+typedef CGAL::Nef_polyhedron_3<Kernel1, CGAL::SNC_indexed_items> Nef_polyhedron_3;
+typedef Nef_polyhedron_3::Volume_const_iterator Volume_const_iterator;
+
+int Scene3D::testPolyedraDecomposition() {
+	int ret = EXIT_FAILURE;
+	if (true/*tmesh.size() == 1*/) {
+		Polyhedron_3 mesh;// = tmesh[0];
+		std::ifstream inStrm("F:\\Lavoro\\MElmasry\\Part1.off", std::ios::in);
+		inStrm >> mesh;
+
+		Nef_polyhedron_3 N(mesh);
+		CGAL::convex_decomposition_3(N);
+		std::vector<Polyhedron_3> convex_parts;
+		Volume_const_iterator ci = ++N.volumes_begin();
+		for (; ci != N.volumes_end(); ++ci) {
+			if (ci->mark()) {
+				Polyhedron_3 P;
+				N.convert_inner_shell_to_polyhedron(ci->shells_begin(), P);
+				convex_parts.push_back(P);
+			}
+		}
+		std::string fName;
+		for (int i = 0 ; i < (int)convex_parts.size() ; i++) {
+			std::ostringstream stringStream;
+			stringStream << "C:\\temp\\convex_part_";
+			stringStream << i;
+			stringStream << ".off";
+			fName = stringStream.str();
+			std::ofstream outStrm(fName.c_str(), std::ios::out);
+			outStrm << convex_parts[i];
+			outStrm.close();
+		}
+		ret = EXIT_SUCCESS;
+	}
 	return ret;
 }

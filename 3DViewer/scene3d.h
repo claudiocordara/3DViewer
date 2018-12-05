@@ -8,6 +8,14 @@
 #include <CGAL/Subdivision_method_3.h>
 #include <CGAL/assertions.h>
 #include <CGAL/exceptions.h>
+
+#include <CGAL/Exact_predicates_exact_constructions_kernel.h>
+#include <CGAL/Nef_polyhedron_3.h>
+#include <CGAL/IO/Nef_polyhedron_iostream_3.h>
+#include <CGAL/Nef_3/SNC_indexed_items.h>
+#include <CGAL/convex_decomposition_3.h> 
+#include <list>
+
 #include <vector>
 #include <QtGui> 
 #include <QtWidgets>
@@ -100,6 +108,7 @@ protected:
 public:
 	int showElem;
 	std::vector<Polyhedron> tmesh;
+	std::vector<Polyhedron> segMesh;
 	Scene3D(QWidget * parent = 0);
 	void load(Polyhedron mesh);
 	void add(Polyhedron mesh);
@@ -125,10 +134,16 @@ public:
 	int getSkeleton();
 	void switchColors();
 	void getParts();
+
 	void newPart();
+	bool splitParts();
+
+	
 	void groupsToOff();
 	void drawParts();
 	void drawPWireframe();
-	int testSegmentation();
+	int testSegmentationBySDF();
+	int testSegmentationBySkeleton();
+	int testPolyedraDecomposition();
 };
 #endif
