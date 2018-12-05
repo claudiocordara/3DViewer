@@ -45,6 +45,8 @@ public:
 	void setDockOptions3();
 
 	void keyPressEvent(QKeyEvent* pe) { return widget->keyPressEvent(pe); }
-	int TestSegmentation();
+	int TestSegmentationBySDF();
+	int TestSegmentationBySkeleton();
+	int TestPolyedraDecomposition();
 };
 #endif

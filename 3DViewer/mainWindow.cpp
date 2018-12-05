@@ -98,7 +98,9 @@ MainWindow::MainWindow()
 
 
 	menuTest = menuBar()->addMenu(tr("Test"));
-	action = menuTest->addAction(tr("Segmentation"), this, &MainWindow::TestSegmentation);
+	action = menuTest->addAction(tr("Segmentation By SDF"), this, &MainWindow::TestSegmentationBySDF);
+	action = menuTest->addAction(tr("Segmentation By Skeleton"), this, &MainWindow::TestSegmentationBySkeleton);
+	action = menuTest->addAction(tr("Polyedra Decomposition"), this, &MainWindow::TestPolyedraDecomposition);
 }
 
 // Open the STL and OFF files
@@ -393,12 +395,29 @@ void MainWindow::setDockOptions3() {
 
 
 
-int MainWindow::TestSegmentation() {
-	int ret = widget->testSegmentation();
+int MainWindow::TestSegmentationBySDF() {
+	int ret = widget->testSegmentationBySDF();
 	if (ret == EXIT_SUCCESS) {
 		QList<QAction*> actions = menuOptions->actions();
 		actions.at(6)->setEnabled(true);
 		actions.at(7)->setEnabled(true);
 	}
+	return ret;
+}
+
+
+int MainWindow::TestSegmentationBySkeleton() {
+	int ret = widget->testSegmentationBySkeleton();
+	if (ret == EXIT_SUCCESS) {
+		QList<QAction*> actions = menuOptions->actions();
+		actions.at(6)->setEnabled(true);
+		actions.at(7)->setEnabled(true);
+	}
+	return ret;
+}
+
+
+int MainWindow::TestPolyedraDecomposition() {
+	int ret = widget->testPolyedraDecomposition();
 	return ret;
 }
