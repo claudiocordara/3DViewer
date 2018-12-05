@@ -486,15 +486,22 @@ std::vector<int> SkelSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int
 			buf.clear();
 			// if the current vertex is not processed
 			if (segArr[i] == -1) {
-				// loop over skeleton's edges
-				for (uint32_t j = 0; j < esize * 2; j++)
+				// loop over skeleton's edges, from source to target (with j=0,2,4..) and from target to source (with j=1,3,5..)
+				for (uint32_t j = 0; j < esize * 2; j++) {
 					// if the edge include the current vertex
-					if (edgeArr[2 * j] == i)
+					if (edgeArr[2 * j] == i) {
 						// add neighboring vertex to buffer
 						buf.push_back({ edgeArr[2 * j + 1], i, 0 });
+					}
+				}
 				
 				// choose as start point the any not a simple medium vertex 
-				if (buf.size() != 2) break;
+				// if buf.size() == 0 the vertex is isolated
+				// if buf.size() == 1 the vertex is at one of the extremities of the skeleton
+				// if buf.size() == 2 the vertex is in the interior of the skeleton but not on a branch
+				// if buf.size() > 2 the vertex is in the interior of the skeleton and on a branch
+				if (buf.size() != 2)
+					break;
 			}
 		}
 
@@ -507,11 +514,13 @@ std::vector<int> SkelSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int
 
 		// neighbors of start vertex will be used as initial set of non-processed vertices
 		// in a case of branching vertex
-		if (buf.size() > 2)
+		if (buf.size() > 2) {
 			// loop over neighboring vertices (exclude the last one)
-			for (uint32_t j = 0; j < buf.size() - 1; j++)
+			for (uint32_t j = 0; j < buf.size() - 1; j++) {
 				// set the 'new segment' property
 				buf[j][2] = 1;
+			}
+		}
 
 		// loop while we have non-processed vertices (joined to start)
 		while (buf.size() > 0) {
@@ -545,7 +554,7 @@ std::vector<int> SkelSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int
 				next.clear();
 
 				// loop over skeleton's edges 
-				for (uint32_t j = 0; j < esize * 2; j++)
+				for (uint32_t j = 0; j < esize * 2; j++) {
 					// if the edge include the current vertex
 					if (edgeArr[2 * j] == cur) {
 						// if the neighboring vertex is non-processed
@@ -553,18 +562,22 @@ std::vector<int> SkelSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int
 							// add the neighboring vertex to buffer
 							next.push_back(edgeArr[2 * j + 1]);
 					}
+				}
 
 				// if we have more than one neighbors then set the 'new branch' property to true
-				if (next.size() > 1) tp = 1;
+				if (next.size() > 1) {
+					tp = 1;
+				}
 
 				// loop over neighbors
-				for (uint32_t j = 0; j < next.size(); j++)
+				for (uint32_t j = 0; j < next.size(); j++) {
 					// add neighbor to the buffer of non-processed vertices
 					buf.push_back({ next[j], cur, tp });
+				}
 			}
-			
-			// vertex is already processed, just remove it from the buffer
-			else buf.pop_back();
+			else { // vertex is already processed, just remove it from the buffer
+				buf.pop_back();
+			}
 		}
 		
 		// the current group was ended, go the next one 
@@ -710,6 +723,70 @@ std::vector<uint32_t> GetSeg3(uint32_t vsize, uint32_t esize, uint32_t * edgeArr
 	return result;
 }
 
+
+std::vector<std::array<int32_t, 3>> GetAllSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int32_t * segArr) {
+	// input variables:
+	// vsize - the number of skeleton's vertices
+	// esize - the number of skeleton's edges
+	// edgeArr - the array of skeleton's edges
+	// segArr - the array of skeleton's segments
+
+	// initiate the array of 'outer' segments
+	std::vector<std::array<int32_t, 3>> segs;
+
+	// loop over skeleton's vertices
+	uint32_t i = 0;
+	for (i = 0; i < vsize; i++) {
+		// initiate the counter of neighboring vertices	
+		int count = 0;
+		// loop over skeleton's edges
+		for (uint32_t j = 0; j < esize * 2; j++) {
+			// if the edge include the current vertex increase the counter
+			if (edgeArr[2 * j] == i)
+				count++;
+		}
+
+		// if the vertex has only single neighbor then it's a start of 'outer' branch
+		// if count == 0 the vertex is isolated
+		// if count == 1 the vertex is at one of the extremities of the skeleton
+		// if count == 2 the vertex is in the interior of the skeleton but not on a branch
+		// if count > 2 the vertex is in the interior of the skeleton and on a branch
+		if (count == 1) {
+			segs.push_back({ segArr[i], 0, 0 });
+		}
+	}
+
+	// if we have no any 'outer' segment
+	if (segs.size() == 0) {
+		// return error
+		segs.push_back({ -1, 0, 0 });
+		return segs;
+	}
+
+	// loop over skeleton's vertices
+	for (i = 0; i < vsize; i++) {
+		// loop over the segments
+		for (uint32_t j = 0; j < segs.size(); j++) {
+			// if the current vertex has the same segment then increase the counter
+			if (segArr[i] == segs[j][0])
+				segs[j][2]++;
+		}
+	}
+
+	// loop over skeleton's edges
+	for (uint32_t j = 0; j < esize * 2; j++)
+		// loop over the segments
+		for (int s = 0; s < segs.size(); s++)
+			// if current vertex has the same segment but its neighbor has different one
+			if (segArr[edgeArr[2 * j]] == segs[s][0] && segArr[edgeArr[2 * j + 1]] != segs[s][0])
+				// save it as the end point of segment
+				segs[s][1] = edgeArr[2 * j];
+
+	return segs;
+}
+
+
+
 // search for the 'outer' segments of skeleton
 std::array<int32_t, 3> GetSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int32_t * segArr)
 {
@@ -723,17 +800,25 @@ std::array<int32_t, 3> GetSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr
 	std::vector<std::array<int32_t, 3>> segs;
 
 	// loop over skeleton's vertices
-	uint32_t i;
+	uint32_t i = 0;
 	for (i = 0; i < vsize; i++)	{
 		// initiate the counter of neighboring vertices	
 		int count = 0;
 		// loop over skeleton's edges
-		for (uint32_t j = 0; j < esize * 2; j++)
+		for (uint32_t j = 0; j < esize * 2; j++) {
 			// if the edge include the current vertex increase the counter
-			if (edgeArr[2 * j] == i) count++;
+			if (edgeArr[2 * j] == i)
+				count++;
+		}
 
 		// if the vertex has only single neighbor then it's a start of 'outer' branch
-		if (count == 1) segs.push_back({ segArr[i], 0, 0 });
+		// if count == 0 the vertex is isolated
+		// if count == 1 the vertex is at one of the extremities of the skeleton
+		// if count == 2 the vertex is in the interior of the skeleton but not on a branch
+		// if count > 2 the vertex is in the interior of the skeleton and on a branch
+		if (count == 1) {
+			segs.push_back({ segArr[i], 0, 0 });
+		}
 	}
 
 	// if we have no any 'outer' segment
@@ -744,11 +829,14 @@ std::array<int32_t, 3> GetSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr
 	}
 
 	// loop over skeleton's vertices
-	for (i = 0; i < vsize; i++)
+	for (i = 0; i < vsize; i++) {
 		// loop over the segments
-		for (uint32_t j = 0; j < segs.size(); j++)
+		for (uint32_t j = 0; j < segs.size(); j++) {
 			// if the current vertex has the same segment then increase the counter
-			if (segArr[i] == segs[j][0]) segs[j][2]++;
+			if (segArr[i] == segs[j][0])
+				segs[j][2]++;
+		}
+	}
 	
 	// loop over skeleton's edges
 	for (uint32_t j = 0; j < esize * 2; j++)

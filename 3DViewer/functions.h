@@ -20,6 +20,7 @@ void meshToOff(char * filename, Polyhedron P);
 std::vector<int> SkelSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int32_t * segArr);
 int isLoop(uint32_t start, uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int32_t * segArr);
 int nearSkel(uint32_t start, uint32_t esize, uint32_t * edgeArr, int32_t * segArr);
+std::vector<std::array<int32_t, 3>> GetAllSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int32_t * segArr);
 std::vector<uint32_t> GetSeg3(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int32_t * segArr);
 std::array<int32_t, 3> GetSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int32_t * segArr);
 Polyhedron mergePoly(std::vector<Polyhedron> P, int sp, int lp);
