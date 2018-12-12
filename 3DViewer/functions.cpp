@@ -441,7 +441,7 @@ Polyhedron arrToMesh(std::vector<double> coords, std::vector<int> tris)
 }
 
 // save CGAL mesh to OFF file
-void meshToOff(char * filename, Polyhedron P)
+void meshToOff(const char * filename, Polyhedron P)
 {
 	// input variables:
 	// filename - the path to save
@@ -724,7 +724,7 @@ std::vector<uint32_t> GetSeg3(uint32_t vsize, uint32_t esize, uint32_t * edgeArr
 }
 
 
-std::vector<std::array<int32_t, 3>> GetAllSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int32_t * segArr) {
+std::vector<std::array<int32_t, 4>> GetAllSeg(uint32_t vsize, uint32_t esize, uint32_t * edgeArr, int32_t * segArr) {
 	// input variables:
 	// vsize - the number of skeleton's vertices
 	// esize - the number of skeleton's edges
@@ -732,55 +732,93 @@ std::vector<std::array<int32_t, 3>> GetAllSeg(uint32_t vsize, uint32_t esize, ui
 	// segArr - the array of skeleton's segments
 
 	// initiate the array of 'outer' segments
-	std::vector<std::array<int32_t, 3>> segs;
+	std::vector<std::array<int32_t, 4>> segs;
+
+	// segs[i][0] = Id of the i-th segment the segment will contains all skeleton vertices with SkelSegVert[vertex index] == Id
+	// segs[i][1] = Index of the end point of the segment, it is a skeleton vertex index
+	// segs[i][2] = Number of vertices in the segment
+	// segs[i][3] = Index of the start point of the segment, it is a skeleton vertex index, is -1 if it is an outer segment
 
 	// loop over skeleton's vertices
-	uint32_t i = 0;
-	for (i = 0; i < vsize; i++) {
-		// initiate the counter of neighboring vertices	
-		int count = 0;
-		// loop over skeleton's edges
-		for (uint32_t j = 0; j < esize * 2; j++) {
-			// if the edge include the current vertex increase the counter
-			if (edgeArr[2 * j] == i)
-				count++;
-		}
+	//uint32_t i = 0;
+	//for (i = 0; i < vsize; i++) {
+	//	// initiate the counter of neighboring vertices	
+	//	int count = 0;
+	//	// loop over skeleton's edges
+	//	for (uint32_t j = 0; j < esize * 2; j++) {
+	//		// if the edge include the current vertex increase the counter
+	//		if (edgeArr[2 * j] == i)
+	//			count++;
+	//	}
 
-		// if the vertex has only single neighbor then it's a start of 'outer' branch
-		// if count == 0 the vertex is isolated
-		// if count == 1 the vertex is at one of the extremities of the skeleton
-		// if count == 2 the vertex is in the interior of the skeleton but not on a branch
-		// if count > 2 the vertex is in the interior of the skeleton and on a branch
-		if (count == 1) {
-			segs.push_back({ segArr[i], 0, 0 });
+	//	// if the vertex has only single neighbor then it's a start of 'outer' branch
+	//	// if count == 0 the vertex is isolated
+	//	// if count == 1 the vertex is at one of the extremities of the skeleton
+	//	// if count == 2 the vertex is in the interior of the skeleton but not on a branch
+	//	// if count > 2 the vertex is in the interior of the skeleton and on a branch
+	//	if (count == 1) {
+	//		segs.push_back({ segArr[i], 0, 0 });
+	//	}
+	//}
+	for (int i = 0 ; i < (int)vsize ; i++) {
+		int segId = segArr[i];
+		bool found = false;
+		for (int j = 0 ; j < (int)segs.size() && !found ; j++) {
+			if (segs[j][0] == segId) {
+				found = true;
+				segs[j][2]++;
+			}
+		}
+		if (!found) {
+			segs.push_back({ segId, -1, 1, -1 });
 		}
 	}
 
 	// if we have no any 'outer' segment
 	if (segs.size() == 0) {
 		// return error
-		segs.push_back({ -1, 0, 0 });
+		segs.push_back({ -1, 0, 0, -1 });
 		return segs;
 	}
 
 	// loop over skeleton's vertices
-	for (i = 0; i < vsize; i++) {
-		// loop over the segments
-		for (uint32_t j = 0; j < segs.size(); j++) {
-			// if the current vertex has the same segment then increase the counter
-			if (segArr[i] == segs[j][0])
-				segs[j][2]++;
+	//for (int i = 0; i < vsize; i++) {
+	//	// loop over the segments
+	//	for (uint32_t j = 0; j < segs.size(); j++) {
+	//		// if the current vertex has the same segment then increase the counter
+	//		if (segArr[i] == segs[j][0])
+	//			segs[j][2]++;
+	//	}
+	//}
+
+	// loop over skeleton's edges
+	//for (uint32_t j = 0; j < esize * 2; j++) {
+	//	// loop over the segments
+	//	for (int s = 0; s < segs.size(); s++) {
+	//		// if current vertex has the same segment but its neighbor has different one
+	//		if (segArr[edgeArr[2 * j]] == segs[s][0] && segArr[edgeArr[2 * j + 1]] != segs[s][0]) {
+	//			// save it as the end point of segment
+	//			segs[s][1] = edgeArr[2 * j];
+	//		}
+	//	}
+	//}
+
+	for (uint32_t j = 0; j < esize; j++) {
+		for (int s = 0; s < segs.size(); s++) {
+			if (segArr[edgeArr[4 * j]] == segs[s][0] && segArr[edgeArr[4 * j + 1]] != segs[s][0]) {
+				segs[s][1] = edgeArr[4 * j];
+			}
 		}
 	}
 
-	// loop over skeleton's edges
-	for (uint32_t j = 0; j < esize * 2; j++)
-		// loop over the segments
-		for (int s = 0; s < segs.size(); s++)
-			// if current vertex has the same segment but its neighbor has different one
-			if (segArr[edgeArr[2 * j]] == segs[s][0] && segArr[edgeArr[2 * j + 1]] != segs[s][0])
-				// save it as the end point of segment
-				segs[s][1] = edgeArr[2 * j];
+
+	for (uint32_t j = 0; j < esize ; j++) {
+		for (int s = 0; s < segs.size(); s++) {
+			if (segArr[edgeArr[4 * j + 2]] == segs[s][0] && segArr[edgeArr[4 * j + 3]] != segs[s][0]) {
+				segs[s][3] = edgeArr[4 * j + 2];
+			}
+		}
+	}
 
 	return segs;
 }

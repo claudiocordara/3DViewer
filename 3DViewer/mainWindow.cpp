@@ -41,11 +41,52 @@ MainWindow::MainWindow()
 	// create 'Get new part' item and set it as disabled
 	action = menuActions->addAction(tr("Get new part"), this, &MainWindow::nPart);
 	action->setEnabled(false);
+	menuActions->addSeparator();
+	action = menuActions->addAction(tr("Split and Save by Skeleton"), this, &MainWindow::splitAndSaveBySkeleton);
+	action->setEnabled(true);
+	action = menuActions->addAction(tr("Split and Save by SDF"), this, &MainWindow::splitAndSaveBySDF);
+	action->setEnabled(true);
+	action = menuActions->addAction(tr("Split and Save by Skeleton and SDF"), this, &MainWindow::splitAndSaveBySkeletonAndSDF);
+	action->setEnabled(true);
 
+
+	mLayout = new QHBoxLayout();
+	//QPushButton *button1 = new QPushButton("One");
 	// create widget (Scene3D object) to show the 3D-objects
 	widget = new Scene3D(this);
+	mTree = new QTreeWidget();
+	mTree->setColumnCount(1);
+
+	//QList<QTreeWidgetItem *> items;
+	//for (int i = 0; i < 10; ++i)
+	//	items.append(new QTreeWidgetItem((QTreeWidget*)0, QStringList(QString("item: %1").arg(i))));
+	//tree->insertTopLevelItems(0, items);
+	//QTreeWidgetItem *itm1 = new QTreeWidgetItem(QStringList(QString("1")));
+	//QTreeWidgetItem *itm2 = new QTreeWidgetItem(QStringList(QString("2")));
+	//itm1->addChild(itm2);
+	//tree->insertTopLevelItem(0, itm1);
+	if (QTreeWidgetItem* header = mTree->headerItem()) {
+		header->setText(0, "Segmentation");
+	}
+	else {
+		mTree->setHeaderLabel("Segmentation");
+	}
+
+	QSizePolicy spLeft(QSizePolicy::Preferred, QSizePolicy::Preferred);
+	spLeft.setHorizontalStretch(2);
+	widget->setSizePolicy(spLeft);
+	QSizePolicy spRight(QSizePolicy::Preferred, QSizePolicy::Preferred);
+	spRight.setHorizontalStretch(1);
+	mTree->setSizePolicy(spRight);
+
+
+	mLayout->addWidget(widget);
+	mLayout->addWidget(mTree);
+
+	QWidget *central = new QWidget();
 	// Set it as central widget of window
-	setCentralWidget(widget);
+	setCentralWidget(central);
+	centralWidget()->setLayout(mLayout);
 
 	// create the 'Elements' menu which will provide the control of visibility of elements
 	menuOptions = menuBar()->addMenu(tr("Elements"));
@@ -99,8 +140,11 @@ MainWindow::MainWindow()
 
 	menuTest = menuBar()->addMenu(tr("Test"));
 	action = menuTest->addAction(tr("Segmentation By SDF"), this, &MainWindow::TestSegmentationBySDF);
-	action = menuTest->addAction(tr("Segmentation By Skeleton"), this, &MainWindow::TestSegmentationBySkeleton);
+	action = menuTest->addAction(tr("Segmentation By Skeleton and SDF"), this, &MainWindow::TestSegmentationBySkeletonAndSDF);
 	action = menuTest->addAction(tr("Polyedra Decomposition"), this, &MainWindow::TestPolyedraDecomposition);
+
+	mTree->clear();
+
 }
 
 // Open the STL and OFF files
@@ -150,10 +194,15 @@ void MainWindow::openModel()
 	// delete the existing widget
 	delete widget;
 	// create the widget with new mesh
+	mLayout->removeWidget(widget);
 	widget = new Scene3D(this);
+	QSizePolicy spLeft(QSizePolicy::Preferred, QSizePolicy::Preferred);
+	spLeft.setHorizontalStretch(2);
+	widget->setSizePolicy(spLeft);
 	widget->load(mesh);
 	// set it as central widget of window
-	setCentralWidget(widget);
+	mLayout->insertWidget(0, widget);
+	//setCentralWidget(widget);
 	setFigureOn();
 }
 
@@ -214,6 +263,32 @@ void MainWindow::nPart()
 	// refresh the 'elements visibility' variable
 	setDockOptions();
 }
+
+
+void MainWindow::splitAndSaveBySkeleton() {
+	widget->splitPartsBySkeleton();
+
+	QList<QAction*> actions = menuOptions->actions();
+	actions.at(5)->setEnabled(true);
+}
+
+void MainWindow::splitAndSaveBySDF() {
+	widget->splitPartBySDF();
+
+	QList<QAction*> actions = menuOptions->actions();
+	actions.at(6)->setEnabled(true);
+	actions.at(7)->setEnabled(true);
+}
+
+
+void MainWindow::splitAndSaveBySkeletonAndSDF() {
+	widget->splitPartBySkeletonAndSDF();
+
+	QList<QAction*> actions = menuOptions->actions();
+	actions.at(6)->setEnabled(true);
+	actions.at(7)->setEnabled(true);
+}
+
 
 // Save all #D-objects (main and extracted parts) to OFF files
 void MainWindow::savePOFF()
@@ -406,8 +481,8 @@ int MainWindow::TestSegmentationBySDF() {
 }
 
 
-int MainWindow::TestSegmentationBySkeleton() {
-	int ret = widget->testSegmentationBySkeleton();
+int MainWindow::TestSegmentationBySkeletonAndSDF() {
+	int ret = widget->testSegmentationBySkeletonAndSDF();
 	if (ret == EXIT_SUCCESS) {
 		QList<QAction*> actions = menuOptions->actions();
 		actions.at(6)->setEnabled(true);
@@ -420,4 +495,21 @@ int MainWindow::TestSegmentationBySkeleton() {
 int MainWindow::TestPolyedraDecomposition() {
 	int ret = widget->testPolyedraDecomposition();
 	return ret;
+}
+
+void MainWindow::clearTree() {
+	mTree->clear();
+	mItems.clear();
+}
+
+
+void MainWindow::addTreeItem(int _parentIndex, QString _text) {
+	QTreeWidgetItem *itm = new QTreeWidgetItem(QStringList(_text));
+	if (_parentIndex >= 0 && _parentIndex < mItems.size()) {
+		mItems[_parentIndex]->addChild(itm);
+	}
+	else {
+		mItems.append(itm);
+		mTree->addTopLevelItem(itm);
+	}
 }

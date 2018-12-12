@@ -21,6 +21,9 @@
 #include <QtWidgets>
 #include <QtOpenGL/QGLWidget>
 
+
+class MainWindow;
+
 // define the most used CGAL types
 typedef CGAL::Simple_cartesian<double>									Kernel;
 typedef Kernel::Point_3													Point;
@@ -78,6 +81,8 @@ private:
 	GLuint *PEdgeIndex;			// array of part's edges
 	std::vector<int> SegGroups;	// array of skeleton's unjoined parts
 
+	MainWindow *mParentWnd;
+
 	void scale_plus();
 	void scale_minus();
 	void rotate_up();
@@ -108,8 +113,10 @@ protected:
 public:
 	int showElem;
 	std::vector<Polyhedron> tmesh;
+
 	std::vector<Polyhedron> segMesh;
-	Scene3D(QWidget * parent = 0);
+	
+	Scene3D(MainWindow * parent);
 	void load(Polyhedron mesh);
 	void add(Polyhedron mesh);
 	void keyPressEvent(QKeyEvent* pe)
@@ -136,14 +143,43 @@ public:
 	void getParts();
 
 	void newPart();
-	bool splitParts();
+	bool splitPartsBySkeleton();
+	bool splitPartBySDF();
+	bool splitPartBySkeletonAndSDF();
+
 
 	
 	void groupsToOff();
 	void drawParts();
 	void drawPWireframe();
 	int testSegmentationBySDF();
-	int testSegmentationBySkeleton();
+	int testSegmentationBySkeletonAndSDF();
 	int testPolyedraDecomposition();
+
+	int computeSegmentHierarchy();
 };
+
+
+typedef boost::graph_traits<Polyhedron>::face_descriptor             face_descriptor;
+
+// Property map associating a facet with an integer as id to an
+// element in a vector stored internally
+template<class ValueType>
+struct Facet_with_id_pmap : public boost::put_get_helper<ValueType&, Facet_with_id_pmap<ValueType> > {
+	typedef face_descriptor key_type;
+	typedef ValueType value_type;
+	typedef value_type& reference;
+	typedef boost::lvalue_property_map_tag category;
+	Facet_with_id_pmap(
+		std::vector<ValueType>& internal_vector
+	) : internal_vector(internal_vector) { }
+	reference operator[](key_type key) const
+	{
+		return internal_vector[key->id()];
+	}
+private:
+	std::vector<ValueType>& internal_vector;
+};
+
+
 #endif

@@ -49,8 +49,5 @@
     <CustomBuild Include="mainWindow.h">
       <Filter>Header Files</Filter>
     </CustomBuild>
-    <CustomBuild Include="scene3d.ui">
-      <Filter>Qt</Filter>
-    </CustomBuild>
   </ItemGroup>
 </Project>

@@ -12,6 +12,7 @@
 #define sdfColors 0x80
 
 #include <QMainWindow>
+#include <qtreewidget.h>
 #include "scene3d.h"
 
 class MainWindow : public QMainWindow
@@ -20,13 +21,24 @@ class MainWindow : public QMainWindow
 
 private:
 
+
 public:
 	MainWindow();
+	QList<QTreeWidgetItem*> mItems;
+	QHBoxLayout *mLayout;
+	QTreeWidget *mTree;
 	Scene3D * widget;		// Qt widget to show the 3D objects
 	QMenu * menuActions;	// 'Process' menu
 	QMenu * menuOptions;	// 'Elements' menu
 	QMenu * menuTest;
-	private slots:
+
+
+	void clearTree();
+	void addTreeItem(int _parentIndex, QString _text);
+
+
+private slots:
+
 	void openModel();
 	void addPart();
 	void savePOFF();
@@ -46,7 +58,12 @@ public:
 
 	void keyPressEvent(QKeyEvent* pe) { return widget->keyPressEvent(pe); }
 	int TestSegmentationBySDF();
-	int TestSegmentationBySkeleton();
+	int TestSegmentationBySkeletonAndSDF();
 	int TestPolyedraDecomposition();
+
+	void splitAndSaveBySkeleton();
+	void splitAndSaveBySDF();
+	void splitAndSaveBySkeletonAndSDF();
+
 };
 #endif
