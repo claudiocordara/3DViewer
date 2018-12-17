@@ -7,6 +7,8 @@
 #include "scene3d.h"
 #include "functions.h"
 
+//#define ENABLE_TEST
+
 // The MainWindow class to visualization of 3D-objects and their processing control
 MainWindow::MainWindow()
 {
@@ -61,10 +63,7 @@ MainWindow::MainWindow()
 	//for (int i = 0; i < 10; ++i)
 	//	items.append(new QTreeWidgetItem((QTreeWidget*)0, QStringList(QString("item: %1").arg(i))));
 	//tree->insertTopLevelItems(0, items);
-	//QTreeWidgetItem *itm1 = new QTreeWidgetItem(QStringList(QString("1")));
-	//QTreeWidgetItem *itm2 = new QTreeWidgetItem(QStringList(QString("2")));
-	//itm1->addChild(itm2);
-	//tree->insertTopLevelItem(0, itm1);
+
 	if (QTreeWidgetItem* header = mTree->headerItem()) {
 		header->setText(0, "Segmentation");
 	}
@@ -126,6 +125,7 @@ MainWindow::MainWindow()
 	action->setChecked(false);
 	action->setEnabled(false);
 	connect(action, &QAction::toggled, this, &MainWindow::setDockOptions1);
+#ifdef ENABLE_TEST
 	action = menuOptions->addAction(tr("Colored segments test"));
 	action->setCheckable(true);
 	action->setChecked(false);
@@ -136,14 +136,23 @@ MainWindow::MainWindow()
 	action->setChecked(false);
 	action->setEnabled(false);
 	connect(action, &QAction::toggled, this, &MainWindow::setDockOptions3);
-
-
 	menuTest = menuBar()->addMenu(tr("Test"));
 	action = menuTest->addAction(tr("Segmentation By SDF"), this, &MainWindow::TestSegmentationBySDF);
 	action = menuTest->addAction(tr("Segmentation By Skeleton and SDF"), this, &MainWindow::TestSegmentationBySkeletonAndSDF);
 	action = menuTest->addAction(tr("Polyedra Decomposition"), this, &MainWindow::TestPolyedraDecomposition);
+#endif
+
+	connect(mTree, SIGNAL(itemClicked(QTreeWidgetItem *, int)), this, SLOT(segmentItemClicked(QTreeWidgetItem *, int)));
+
 
 	mTree->clear();
+	mSelectedTreeItem = NULL;
+
+
+	//QTreeWidgetItem *itm1 = new QTreeWidgetItem(QStringList(QString("1")));
+	//QTreeWidgetItem *itm2 = new QTreeWidgetItem(QStringList(QString("2")));
+	//itm1->addChild(itm2);
+	//mTree->insertTopLevelItem(0, itm1);
 
 }
 
@@ -276,8 +285,10 @@ void MainWindow::splitAndSaveBySDF() {
 	widget->splitPartBySDF();
 
 	QList<QAction*> actions = menuOptions->actions();
+#ifdef ENABLE_TEST
 	actions.at(6)->setEnabled(true);
 	actions.at(7)->setEnabled(true);
+#endif
 }
 
 
@@ -285,8 +296,10 @@ void MainWindow::splitAndSaveBySkeletonAndSDF() {
 	widget->splitPartBySkeletonAndSDF();
 
 	QList<QAction*> actions = menuOptions->actions();
+#ifdef ENABLE_TEST
 	actions.at(6)->setEnabled(true);
 	actions.at(7)->setEnabled(true);
+#endif
 }
 
 
@@ -424,6 +437,7 @@ void MainWindow::setDockOptions()
 		widget->showElem &= ~segColors;
 		widget->showElem &= ~sdfColors;
 	}
+#ifdef ENABLE_TEST
 	if (actions.at(6)->isChecked()) {
 		int ntshColors = ~shColors;
 		widget->showElem &= ~shColors;
@@ -435,6 +449,7 @@ void MainWindow::setDockOptions()
 		widget->showElem &= ~segColors;
 		widget->showElem |= sdfColors;
 	}
+#endif
 
 	// set the colors (to apply 'Colored segments' item)
 	sColors();
@@ -444,33 +459,40 @@ void MainWindow::setDockOptions()
 }
 
 void MainWindow::setDockOptions1() {
+#ifdef ENABLE_TEST
 	QList<QAction*> actions = menuOptions->actions();
 	if (actions.at(5)->isChecked()) {
 		actions.at(6)->setChecked(false);
 		actions.at(7)->setChecked(false);
 		setDockOptions();
 	}
+#endif
 }
 void MainWindow::setDockOptions2() {
+#ifdef ENABLE_TEST
 	QList<QAction*> actions = menuOptions->actions();
 	if (actions.at(6)->isChecked()) {
 		actions.at(5)->setChecked(false);
 		actions.at(7)->setChecked(false);
 		setDockOptions();
 	}
+#endif
 }
 void MainWindow::setDockOptions3() {
+#ifdef ENABLE_TEST
 	QList<QAction*> actions = menuOptions->actions();
 	if (actions.at(7)->isChecked()) {
 		actions.at(5)->setChecked(false);
 		actions.at(6)->setChecked(false);
 		setDockOptions();
 	}
+#endif
 }
 
 
 
 int MainWindow::TestSegmentationBySDF() {
+#ifdef ENABLE_TEST
 	int ret = widget->testSegmentationBySDF();
 	if (ret == EXIT_SUCCESS) {
 		QList<QAction*> actions = menuOptions->actions();
@@ -478,10 +500,14 @@ int MainWindow::TestSegmentationBySDF() {
 		actions.at(7)->setEnabled(true);
 	}
 	return ret;
+#else
+	return EXIT_FAILURE;
+#endif
 }
 
 
 int MainWindow::TestSegmentationBySkeletonAndSDF() {
+#ifdef ENABLE_TEST
 	int ret = widget->testSegmentationBySkeletonAndSDF();
 	if (ret == EXIT_SUCCESS) {
 		QList<QAction*> actions = menuOptions->actions();
@@ -489,6 +515,9 @@ int MainWindow::TestSegmentationBySkeletonAndSDF() {
 		actions.at(7)->setEnabled(true);
 	}
 	return ret;
+#else
+	return EXIT_FAILURE;
+#endif
 }
 
 
@@ -499,17 +528,52 @@ int MainWindow::TestPolyedraDecomposition() {
 
 void MainWindow::clearTree() {
 	mTree->clear();
-	mItems.clear();
+	mTreeItems.clear();
 }
 
 
-void MainWindow::addTreeItem(int _parentIndex, QString _text) {
-	QTreeWidgetItem *itm = new QTreeWidgetItem(QStringList(_text));
-	if (_parentIndex >= 0 && _parentIndex < mItems.size()) {
-		mItems[_parentIndex]->addChild(itm);
+void MainWindow::addTreeItem(SegmentGraph::SegmentNode *_node, SegmentGraph::SegmentNode *_parentNode, QString _text) {
+	if (_node != NULL) {
+		QTreeWidgetItem *itm = new QTreeWidgetItem(QStringList(_text));
+		QTreeWidgetItem *parentItem = NULL;
+		if (_parentNode != NULL) {
+			for (int i = 0 ; i < (int)mTreeItems.size() && parentItem == NULL ; i++) {
+				if (mTreeItems[i].second == _parentNode) {
+					parentItem = mTreeItems[i].first;
+				}
+			}
+		}
+		if (parentItem != NULL) {
+			parentItem->addChild(itm);
+		}
+		else {
+			mTree->addTopLevelItem(itm);
+		}
+		mTreeItems.push_back(std::pair<QTreeWidgetItem*, SegmentGraph::SegmentNode*>(itm, _node));
+	}
+}
+
+
+void MainWindow::segmentItemClicked(QTreeWidgetItem * item, int column) {
+	if (item == mSelectedTreeItem) {
+		mTree->clearSelection();
+		mSelectedTreeItem = NULL;
 	}
 	else {
-		mItems.append(itm);
-		mTree->addTopLevelItem(itm);
+		mSelectedTreeItem = item;
 	}
+	widget->updateMesh();
+}
+
+
+SegmentGraph::SegmentNode* MainWindow::getSelectedSegment() {
+	SegmentGraph::SegmentNode *ret = NULL;
+	if (mSelectedTreeItem != NULL) {
+		for (int i = 0 ; i < (int)mTreeItems.size() && ret == NULL ; i++) {
+			if (mTreeItems[i].first == mSelectedTreeItem) {
+				ret = mTreeItems[i].second;
+			}
+		}
+	}
+	return ret;
 }

@@ -33,6 +33,59 @@ typedef Polyhedron::Halfedge_around_facet_circulator					Halfedge_facet_circulat
 typedef Polyhedron::Halfedge_around_facet_const_circulator				Halfedge_facet_const_circulator;
 typedef boost::graph_traits<Polyhedron>::vertex_descriptor				vertex_descriptor;
 
+
+#define			SEGGRAPH_NOTMARKED				0
+#define			SEGGRAPH_VISITED				1
+
+class SegmentGraph {
+public:
+
+	class SegmentNode {
+	public:
+		SegmentNode();
+		SegmentNode(Polyhedron *_seg);
+		~SegmentNode();
+
+		Polyhedron* segment() const;
+		void segment(Polyhedron* _seg);
+		int childCount() const;
+		SegmentNode* getChildAt(int _index) const;
+		void appendChild(SegmentNode* _node);
+		void insertChildAfter(SegmentNode* _node, int _index);
+		SegmentNode* removeChildAt(int _index);
+		void clearChildList();
+		int getFlag() const;
+		void setFlag(int _flag);
+	private:
+		int mFlag;
+		Polyhedron *pSegment;
+		std::vector<SegmentNode*> mChildList;
+	};
+
+	SegmentGraph();
+	~SegmentGraph();
+
+	void addSegment(Polyhedron *_seg);
+	SegmentNode* getNodeWithSegment(Polyhedron *_seg) const;
+	void addConnection(Polyhedron *_seg1, Polyhedron *_seg2);
+	void addChild(Polyhedron *_father, Polyhedron *_child);
+	void addChild(SegmentNode *_father, SegmentNode *_child);
+	void addHRoot(Polyhedron *_seg);
+	void addHRoot(SegmentNode *_node);
+	void clear();
+	int nodeCount() const;
+	SegmentNode* getNodeAt(int _index) const;
+	std::vector<SegmentNode*> getConnectedNodes(SegmentNode *_node) const;
+	int hRootCount() const;
+	SegmentNode* getHRootAt(int _index) const;
+private:
+	std::vector<SegmentNode*> mNodeList;
+	std::vector<std::pair<SegmentNode*,SegmentNode*> > mEdgeList;
+	std::vector<SegmentNode*> mHRootList;
+};
+
+
+
 // Scene3D class to 3D objects visualization using Qt
 class Scene3D : public QGLWidget
 {
@@ -80,6 +133,7 @@ private:
 	GLfloat *PEdgeColor;		// array of part's colors of vertices (for edges)
 	GLuint *PEdgeIndex;			// array of part's edges
 	std::vector<int> SegGroups;	// array of skeleton's unjoined parts
+	SegmentGraph SegGraph;
 
 	MainWindow *mParentWnd;
 
@@ -119,6 +173,7 @@ public:
 	Scene3D(MainWindow * parent);
 	void load(Polyhedron mesh);
 	void add(Polyhedron mesh);
+	void updateMesh();
 	void keyPressEvent(QKeyEvent* pe)
 	{
 		// set the actions of keyboard keys
@@ -157,6 +212,7 @@ public:
 	int testPolyedraDecomposition();
 
 	int computeSegmentHierarchy();
+	int updateSegmentationTree();
 };
 
 

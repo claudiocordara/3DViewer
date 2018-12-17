@@ -15,6 +15,8 @@
 #include <qtreewidget.h>
 #include "scene3d.h"
 
+class SegmentGraph::SegmentNode;
+
 class MainWindow : public QMainWindow
 {
 	Q_OBJECT
@@ -24,7 +26,10 @@ private:
 
 public:
 	MainWindow();
-	QList<QTreeWidgetItem*> mItems;
+
+	std::vector<std::pair<QTreeWidgetItem*, SegmentGraph::SegmentNode*> > mTreeItems;
+
+	//QList<QTreeWidgetItem*> mItems;
 	QHBoxLayout *mLayout;
 	QTreeWidget *mTree;
 	Scene3D * widget;		// Qt widget to show the 3D objects
@@ -32,10 +37,11 @@ public:
 	QMenu * menuOptions;	// 'Elements' menu
 	QMenu * menuTest;
 
+	QTreeWidgetItem *mSelectedTreeItem;
 
 	void clearTree();
-	void addTreeItem(int _parentIndex, QString _text);
-
+	void addTreeItem(SegmentGraph::SegmentNode *_node, SegmentGraph::SegmentNode *_parentNode, QString _text);
+	SegmentGraph::SegmentNode* getSelectedSegment();
 
 private slots:
 
@@ -64,6 +70,8 @@ private slots:
 	void splitAndSaveBySkeleton();
 	void splitAndSaveBySDF();
 	void splitAndSaveBySkeletonAndSDF();
+
+	void segmentItemClicked(QTreeWidgetItem * item, int column);
 
 };
 #endif

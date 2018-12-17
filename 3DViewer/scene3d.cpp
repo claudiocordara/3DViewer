@@ -2,6 +2,7 @@
 #include <vector>
 #include <QtGui> 
 #include <QtWidgets>
+#include <CGAL/Polygon_mesh_processing/intersection.h>
 #include "scene3D.h"
 #include "functions.h"
 #include "mainwindow.h"
@@ -15,6 +16,11 @@ typedef Skeleton::edge_descriptor										Skeleton_edge;
 
 typedef boost::graph_traits<Polyhedron>::vertex_descriptor           vertex_descriptor;
 typedef boost::graph_traits<Polyhedron>::halfedge_descriptor         halfedge_descriptor;
+
+typedef CGAL::AABB_face_graph_triangle_primitive<Polyhedron> Primitive;
+typedef CGAL::AABB_traits<K, Primitive> Traits;
+typedef CGAL::AABB_tree<Traits> Tree;
+typedef K::Segment_3 Segment;
 
 // Initiation of Scene3D object
 Scene3D::Scene3D(MainWindow* parent) : QGLWidget(parent)
@@ -235,15 +241,39 @@ void Scene3D::getMesh()
 	// get the number of facets and vertices
 	vmesh = (int)tmesh[lmesh].size_of_vertices();
 	fmesh = (int)tmesh[lmesh].size_of_facets();
-	
+
 	// resize the arrays
+	if (MeshVertex != NULL) {
+		delete MeshVertex;
+	}
 	MeshVertex = new GLfloat[3 * vmesh];
+	if (MeshColor != NULL) {
+		delete MeshColor;
+	}
 	MeshColor = new GLfloat[4 * vmesh];
+	if (MeshIndex != NULL) {
+		delete MeshIndex;
+	}
 	MeshIndex = new GLuint[3 * fmesh];
+	if (EdgeColor != NULL) {
+		delete EdgeColor;
+	}
 	EdgeColor = new GLfloat[4 * vmesh];
+	if (EdgeIndex != NULL) {
+		delete EdgeIndex;
+	}
 	EdgeIndex = new GLuint[6 * fmesh];
+	if (SkelMapMesh != NULL) {
+		delete SkelMapMesh;
+	}
 	SkelMapMesh = new GLuint[vmesh];
+	if (MeshColorSDF != NULL) {
+		delete MeshColorSDF;
+	}
 	MeshColorSDF = new GLfloat[4 * vmesh];
+	if (MeshColorSeg != NULL) {
+		delete MeshColorSeg;
+	}
 	MeshColorSeg = new GLfloat[4 * vmesh];
 
 	// loop over vertices
@@ -255,7 +285,7 @@ void Scene3D::getMesh()
 		MeshVertex[3 * i] = (p.x() - cx) * asp;
 		MeshVertex[3 * i + 1] = (p.y() - cy) * asp;
 		MeshVertex[3 * i + 2] = (p.z() - cz) * asp;
-		
+
 		// add vertex colors to array of facets colors
 		MeshColor[4 * i] = 0.5f;
 		MeshColor[4 * i + 1] = 0.7f;
@@ -276,13 +306,13 @@ void Scene3D::getMesh()
 
 	// loop over facets
 	i = 0;
-	for (Facet_iterator fi = tmesh[lmesh].facets_begin(); fi != tmesh[lmesh].facets_end(); ++fi, i++)	{
+	for (Facet_iterator fi = tmesh[lmesh].facets_begin(); fi != tmesh[lmesh].facets_end(); ++fi, i++) {
 		// get the facet's vertices enumerator
 		Halfedge_facet_circulator fj = fi->facet_begin();
 		CGAL_assertion(CGAL::circulator_size(fj) >= 3);
 		// loop over facet's vertices
 		int j = 0;
-		do 
+		do
 			// add vertices index to array
 			MeshIndex[3 * i + j++] = std::distance(tmesh[lmesh].vertices_begin(), fj->vertex());
 		while (++fj != fi->facet_begin());
@@ -302,75 +332,168 @@ void Scene3D::getMesh()
 // Calculate the arrays of mesh to use OpenGL (vertices, colors, facets, edges)
 void Scene3D::getParts()
 {
-	// check do we have the correct parts
-	vpart = 0;
-	int lmesh = (int)tmesh.size() - 1;
-	if (lmesh < 1) return;
-	for (int p = 0; p < lmesh; p++)
-		vpart += (int)tmesh[p].size_of_vertices();
-	if (vpart == 0) return;
+	SegmentGraph::SegmentNode* selectedSeg = mParentWnd->getSelectedSegment();
+	if (selectedSeg != NULL && selectedSeg->segment() != NULL) {
+		// check do we have the correct parts
+		//vpart = 0;
+		//int lmesh = (int)tmesh.size() - 1;
+		//if (lmesh < 1) return;
+		//for (int p = 0; p < lmesh; p++)
+		//	vpart += (int)tmesh[p].size_of_vertices();
+		//if (vpart == 0) return;
 
-	// create the common mesh from the parts
-	Polyhedron mesh = mergePoly(tmesh, 0, lmesh);
+		//// create the common mesh from the parts
+		//Polyhedron mesh = mergePoly(tmesh, 0, lmesh);
 
-	// get the number of facets and vertices
-	vpart = (int)mesh.size_of_vertices();
-	fpart = (int)mesh.size_of_facets();
+		//// get the number of facets and vertices
+		//vpart = (int)mesh.size_of_vertices();
+		//fpart = (int)mesh.size_of_facets();
+		Polyhedron *poly = selectedSeg->segment();
+		vpart = (int)poly->size_of_vertices();
+		fpart = (int)poly->size_of_facets();
 
-	// resize the arrays
-	PartVertex = new GLfloat[3 * vpart];
-	PartColor = new GLfloat[4 * vpart];
-	PartIndex = new GLuint[3 * fpart];
-	PEdgeColor = new GLfloat[4 * vpart];
-	PEdgeIndex = new GLuint[6 * fpart];
+		// resize the arrays
+		if (PartVertex != NULL) {
+			delete PartVertex;
+		}
+		PartVertex = new GLfloat[3 * vpart];
+		if (PartColor != NULL) {
+			delete PartColor;
+		}
+		PartColor = new GLfloat[4 * vpart];
+		if (PartIndex != NULL) {
+			delete PartIndex;
+		}
+		PartIndex = new GLuint[3 * fpart];
+		if (PEdgeColor != NULL) {
+			delete PEdgeColor;
+		}
+		PEdgeColor = new GLfloat[4 * vpart];
+		if (PEdgeIndex != NULL) {
+			delete PEdgeIndex;
+		}
+		PEdgeIndex = new GLuint[6 * fpart];
 
-	// loop over vertices
-	int i = 0;
-	for (auto it = mesh.vertices_begin(); it != mesh.vertices_end(); it++, i++) {
-		auto p = it->point();
-		it->id() = i;
-		
-		// add vertex coordinates to array
-		PartVertex[3 * i] = (p.x() - cx) * asp;
-		PartVertex[3 * i + 1] = (p.y() - cy) * asp;
-		PartVertex[3 * i + 2] = (p.z() - cz) * asp;
-		
-		// add vertex colors to array of facet's colors
-		PartColor[4 * i] = 0.7f;
-		PartColor[4 * i + 1] = 0.5f;
-		PartColor[4 * i + 2] = 0.5f;
-		PartColor[4 * i + 3] = 0.3f;
-		
-		// add vertex colors to array of edge's colors
-		PEdgeColor[4 * i] = 0.0f;
-		PEdgeColor[4 * i + 1] = 0.0f;
-		PEdgeColor[4 * i + 2] = 0.25f;
-		PEdgeColor[4 * i + 3] = 1.0f;
+		// loop over vertices
+		int i = 0;
+		for (auto it = poly->vertices_begin(); it != poly->vertices_end(); it++, i++) {
+			auto p = it->point();
+			it->id() = i;
+
+			// add vertex coordinates to array
+			PartVertex[3 * i] = (p.x() - cx) * asp;
+			PartVertex[3 * i + 1] = (p.y() - cy) * asp;
+			PartVertex[3 * i + 2] = (p.z() - cz) * asp;
+
+			// add vertex colors to array of facet's colors
+			PartColor[4 * i] = 1.0f;
+			PartColor[4 * i + 1] = 0.0f;
+			PartColor[4 * i + 2] = 0.0f;
+			PartColor[4 * i + 3] = 1.0f;
+
+			// add vertex colors to array of edge's colors
+			PEdgeColor[4 * i] = 1.0f;
+			PEdgeColor[4 * i + 1] = 0.0f;
+			PEdgeColor[4 * i + 2] = 0.0f;
+			PEdgeColor[4 * i + 3] = 1.0f;
+		}
+
+		// loop over facets
+		i = 0;
+		for (Facet_iterator fi = poly->facets_begin(); fi != poly->facets_end(); ++fi, i++) {
+			// get the facet's vertices enumerator
+			Halfedge_facet_circulator fj = fi->facet_begin();
+			CGAL_assertion(CGAL::circulator_size(fj) >= 3);
+			// loop over facet's vertices
+			int j = 0;
+			do
+				// add vertex indices to array
+				PartIndex[3 * i + j++] = std::distance(poly->vertices_begin(), fj->vertex());
+			while (++fj != fi->facet_begin());
+		}
+		// loop over facets
+		for (i = 0; i < fpart; i++) {
+			// add the edges to array
+			PEdgeIndex[6 * i] = PartIndex[3 * i];
+			PEdgeIndex[6 * i + 1] = PartIndex[3 * i + 1];
+			PEdgeIndex[6 * i + 2] = PartIndex[3 * i + 1];
+			PEdgeIndex[6 * i + 3] = PartIndex[3 * i + 2];
+			PEdgeIndex[6 * i + 4] = PartIndex[3 * i + 2];
+			PEdgeIndex[6 * i + 5] = PartIndex[3 * i];
+		}
 	}
-	
-	// loop over facets
-	i = 0;
-	for (Facet_iterator fi = mesh.facets_begin(); fi != mesh.facets_end(); ++fi, i++) {
-		// get the facet's vertices enumerator
-		Halfedge_facet_circulator fj = fi->facet_begin();
-		CGAL_assertion(CGAL::circulator_size(fj) >= 3);
-		// loop over facet's vertices
-		int j = 0;
-		do
-			// add vertex indices to array
-			PartIndex[3 * i + j++] = std::distance(mesh.vertices_begin(), fj->vertex());
-		while (++fj != fi->facet_begin());
+	else {
+		// check do we have the correct parts
+		vpart = 0;
+		int lmesh = (int)tmesh.size() - 1;
+		if (lmesh < 1) return;
+		for (int p = 0; p < lmesh; p++)
+			vpart += (int)tmesh[p].size_of_vertices();
+		if (vpart == 0) return;
+
+		// create the common mesh from the parts
+		Polyhedron mesh = mergePoly(tmesh, 0, lmesh);
+
+		// get the number of facets and vertices
+		vpart = (int)mesh.size_of_vertices();
+		fpart = (int)mesh.size_of_facets();
+
+		// resize the arrays
+		PartVertex = new GLfloat[3 * vpart];
+		PartColor = new GLfloat[4 * vpart];
+		PartIndex = new GLuint[3 * fpart];
+		PEdgeColor = new GLfloat[4 * vpart];
+		PEdgeIndex = new GLuint[6 * fpart];
+
+		// loop over vertices
+		int i = 0;
+		for (auto it = mesh.vertices_begin(); it != mesh.vertices_end(); it++, i++) {
+			auto p = it->point();
+			it->id() = i;
+
+			// add vertex coordinates to array
+			PartVertex[3 * i] = (p.x() - cx) * asp;
+			PartVertex[3 * i + 1] = (p.y() - cy) * asp;
+			PartVertex[3 * i + 2] = (p.z() - cz) * asp;
+
+			// add vertex colors to array of facet's colors
+			PartColor[4 * i] = 0.7f;
+			PartColor[4 * i + 1] = 0.5f;
+			PartColor[4 * i + 2] = 0.5f;
+			PartColor[4 * i + 3] = 0.3f;
+
+			// add vertex colors to array of edge's colors
+			PEdgeColor[4 * i] = 0.0f;
+			PEdgeColor[4 * i + 1] = 0.0f;
+			PEdgeColor[4 * i + 2] = 0.25f;
+			PEdgeColor[4 * i + 3] = 1.0f;
+		}
+
+		// loop over facets
+		i = 0;
+		for (Facet_iterator fi = mesh.facets_begin(); fi != mesh.facets_end(); ++fi, i++) {
+			// get the facet's vertices enumerator
+			Halfedge_facet_circulator fj = fi->facet_begin();
+			CGAL_assertion(CGAL::circulator_size(fj) >= 3);
+			// loop over facet's vertices
+			int j = 0;
+			do
+				// add vertex indices to array
+				PartIndex[3 * i + j++] = std::distance(mesh.vertices_begin(), fj->vertex());
+			while (++fj != fi->facet_begin());
+		}
+		// loop over facets
+		for (i = 0; i < fpart; i++) {
+			// add the edges to array
+			PEdgeIndex[6 * i] = PartIndex[3 * i];
+			PEdgeIndex[6 * i + 1] = PartIndex[3 * i + 1];
+			PEdgeIndex[6 * i + 2] = PartIndex[3 * i + 1];
+			PEdgeIndex[6 * i + 3] = PartIndex[3 * i + 2];
+			PEdgeIndex[6 * i + 4] = PartIndex[3 * i + 2];
+			PEdgeIndex[6 * i + 5] = PartIndex[3 * i];
+		}
 	}
-	// loop over facets
-	for (i = 0; i < fpart; i++) {
-		// add the edges to array
-		PEdgeIndex[6 * i] = PartIndex[3 * i];
-		PEdgeIndex[6 * i + 1] = PartIndex[3 * i + 1];
-		PEdgeIndex[6 * i + 2] = PartIndex[3 * i + 1];
-		PEdgeIndex[6 * i + 3] = PartIndex[3 * i + 2];
-		PEdgeIndex[6 * i + 4] = PartIndex[3 * i + 2];
-		PEdgeIndex[6 * i + 5] = PartIndex[3 * i];
-	}
+
 }
 
 // Create the CGAL skeleton of the main segment and calculate its arrays
@@ -716,12 +839,13 @@ bool Scene3D::splitPartsBySkeleton() {
 					segMesh.push_back(part);
 				}
 				computeSegmentHierarchy();
-				for (int i = 0; i < (int)segMesh.size(); i++) {
-					// create the serial part of filename
-					std::stringstream sc;
-					sc << "F:\\Sviluppo\\3DViewer\\Data\\part" << i << ".off";
-					meshToOff((char*)(sc.str().c_str()), segMesh[i]);
-				}
+				updateSegmentationTree();
+				//for (int i = 0; i < (int)segMesh.size(); i++) {
+				//	// create the serial part of filename
+				//	std::stringstream sc;
+				//	sc << "F:\\Sviluppo\\3DViewer\\Data\\part" << i << ".off";
+				//	meshToOff((char*)(sc.str().c_str()), segMesh[i]);
+				//}
 			}
 			catch (const CGAL::Assertion_exception e) { // the extracted vertices and facets don't form a proper mesh
 				// create the error message
@@ -926,13 +1050,14 @@ bool Scene3D::splitPartBySDF() {
 				}
 
 				computeSegmentHierarchy();
+				updateSegmentationTree();
 
-				for (int i = 0; i < (int)segMesh.size(); i++) {
-					// create the serial part of filename
-					std::stringstream sc;
-					sc << "F:\\Sviluppo\\3DViewer\\Data\\part" << i << ".off";
-					meshToOff((char*)(sc.str().c_str()), segMesh[i]);
-				}
+				//for (int i = 0; i < (int)segMesh.size(); i++) {
+				//	// create the serial part of filename
+				//	std::stringstream sc;
+				//	sc << "F:\\Sviluppo\\3DViewer\\Data\\part" << i << ".off";
+				//	meshToOff((char*)(sc.str().c_str()), segMesh[i]);
+				//}
 			}
 			catch (const CGAL::Assertion_exception e) { // the extracted vertices and facets don't form a proper mesh
 				// create the error message
@@ -1143,12 +1268,15 @@ bool Scene3D::splitPartBySkeletonAndSDF() {
 					segMesh.push_back(part);
 				}
 
-				for (int i = 0; i < (int)segMesh.size(); i++) {
-					// create the serial part of filename
-					std::stringstream sc;
-					sc << "F:\\Sviluppo\\3DViewer\\Data\\part" << i << ".off";
-					meshToOff((char*)(sc.str().c_str()), segMesh[i]);
-				}
+				computeSegmentHierarchy();
+				updateSegmentationTree();
+
+				//for (int i = 0; i < (int)segMesh.size(); i++) {
+				//	// create the serial part of filename
+				//	std::stringstream sc;
+				//	sc << "F:\\Sviluppo\\3DViewer\\Data\\part" << i << ".off";
+				//	meshToOff((char*)(sc.str().c_str()), segMesh[i]);
+				//}
 			}
 			catch (const CGAL::Assertion_exception e) { // the extracted vertices and facets don't form a proper mesh
 				// create the error message
@@ -1614,14 +1742,16 @@ void Scene3D::drawSkeleton()
 // Draw the facets of mesh
 void Scene3D::drawFacets()
 {
-	// check do the mesh exist
-	if (vmesh == 0) return;
-	// set the vertices
-	glVertexPointer(3, GL_FLOAT, 0, MeshVertex);
-	// set the colors
-	glColorPointer(4, GL_FLOAT, 0, MeshColor);
-	// set the facets
-	glDrawElements(GL_TRIANGLES, 3 * fmesh, GL_UNSIGNED_INT, MeshIndex);
+	if (mParentWnd->getSelectedSegment() == NULL) {
+		// check do the mesh exist
+		if (vmesh == 0) return;
+		// set the vertices
+		glVertexPointer(3, GL_FLOAT, 0, MeshVertex);
+		// set the colors
+		glColorPointer(4, GL_FLOAT, 0, MeshColor);
+		// set the facets
+		glDrawElements(GL_TRIANGLES, 3 * fmesh, GL_UNSIGNED_INT, MeshIndex);
+	}
 }
 
 // Draw the wireframe of mesh
@@ -1670,6 +1800,10 @@ void Scene3D::drawPWireframe()
 // Initiate the scene with a new mesh
 void Scene3D::load(Polyhedron mesh) 
 {
+	segMesh.clear();
+	mParentWnd->clearTree();
+
+
 	// loop over existing parts
 	for (int i = (int)tmesh.size() - 1; i >= 0; i--) {
 		// delete the current part
@@ -1686,6 +1820,13 @@ void Scene3D::load(Polyhedron mesh)
 	// calculate the mesh arrays
 	getMesh();
 }
+
+
+void Scene3D::updateMesh() {
+	getParts();
+	updateGL();
+}
+
 
 // Add new part to existing scene
 void Scene3D::add(Polyhedron mesh)
@@ -2012,47 +2153,77 @@ typedef Nef_polyhedron_3::Volume_const_iterator Volume_const_iterator;
 
 int Scene3D::testPolyedraDecomposition() {
 	int ret = EXIT_FAILURE;
-	if (true/*tmesh.size() == 1*/) {
-		Polyhedron_3 mesh;// = tmesh[0];
-		std::ifstream inStrm("F:\\Lavoro\\MElmasry\\Part1.off", std::ios::in);
-		inStrm >> mesh;
+	//if (true/*tmesh.size() == 1*/) {
+	//	Polyhedron_3 mesh;// = tmesh[0];
+	//	std::ifstream inStrm("F:\\Lavoro\\MElmasry\\Part1.off", std::ios::in);
+	//	inStrm >> mesh;
 
-		Nef_polyhedron_3 N(mesh);
-		CGAL::convex_decomposition_3(N);
-		std::vector<Polyhedron_3> convex_parts;
-		Volume_const_iterator ci = ++N.volumes_begin();
-		for (; ci != N.volumes_end(); ++ci) {
-			if (ci->mark()) {
-				Polyhedron_3 P;
-				N.convert_inner_shell_to_polyhedron(ci->shells_begin(), P);
-				convex_parts.push_back(P);
-			}
-		}
-		std::string fName;
-		for (int i = 0 ; i < (int)convex_parts.size() ; i++) {
-			std::ostringstream stringStream;
-			stringStream << "C:\\temp\\convex_part_";
-			stringStream << i;
-			stringStream << ".off";
-			fName = stringStream.str();
-			std::ofstream outStrm(fName.c_str(), std::ios::out);
-			outStrm << convex_parts[i];
-			outStrm.close();
-		}
-		ret = EXIT_SUCCESS;
-	}
+	//	Nef_polyhedron_3 N(mesh);
+	//	CGAL::convex_decomposition_3(N);
+	//	std::vector<Polyhedron_3> convex_parts;
+	//	Volume_const_iterator ci = ++N.volumes_begin();
+	//	for (; ci != N.volumes_end(); ++ci) {
+	//		if (ci->mark()) {
+	//			Polyhedron_3 P;
+	//			N.convert_inner_shell_to_polyhedron(ci->shells_begin(), P);
+	//			convex_parts.push_back(P);
+	//		}
+	//	}
+	//	std::string fName;
+	//	for (int i = 0 ; i < (int)convex_parts.size() ; i++) {
+	//		std::ostringstream stringStream;
+	//		stringStream << "C:\\temp\\convex_part_";
+	//		stringStream << i;
+	//		stringStream << ".off";
+	//		fName = stringStream.str();
+	//		std::ofstream outStrm(fName.c_str(), std::ios::out);
+	//		outStrm << convex_parts[i];
+	//		outStrm.close();
+	//	}
+	//	ret = EXIT_SUCCESS;
+	//}
 	return ret;
 }
 
+int Scene3D::updateSegmentationTree() {
+	int ret = EXIT_FAILURE;
+	mParentWnd->clearTree();
+	if (SegGraph.nodeCount() > 0) {
+		ret = EXIT_SUCCESS;
+		int segmentTextCounter = 1;
+		for (int i = 0 ; i < SegGraph.hRootCount() ; i++) {
+
+			mParentWnd->addTreeItem(SegGraph.getHRootAt(i), NULL, QString("Segment%1").arg(segmentTextCounter));
+			segmentTextCounter++;
+
+			std::stack<SegmentGraph::SegmentNode*> stackNode;
+			stackNode.push(SegGraph.getHRootAt(i));
+			while (stackNode.empty() == false) {
+				SegmentGraph::SegmentNode *n = stackNode.top();
+				stackNode.pop();
+				for (int j = 0 ; j < n->childCount() ; j++) {
+					SegmentGraph::SegmentNode *childNode = n->getChildAt(j);
+					mParentWnd->addTreeItem(childNode, n, QString("Segment%1").arg(segmentTextCounter));
+					segmentTextCounter++;
+					stackNode.push(childNode);
+				}
+			}
+		}
+	}
+
+	return ret;
+}
 
 int Scene3D::computeSegmentHierarchy() {
+	int ret = EXIT_FAILURE;
 	if (segMesh.empty() == false) {
 		if (mParentWnd != NULL) {
 			mParentWnd->clearTree();
 		}
-
+		SegGraph.clear();
 		std::vector<CGAL::Bbox_3> segBBoxArray;
 		for (int i = 0 ; i < (int)segMesh.size() ; i++) {
+			SegGraph.addSegment(&segMesh[i]);
 			CGAL::Bbox_3 bbox;
 			segBBoxArray.push_back(bbox);
 			for (Polyhedron::Facet_iterator facet_it = segMesh[i].facets_begin(); facet_it != segMesh[i].facets_end(); ++facet_it) {
@@ -2063,6 +2234,272 @@ int Scene3D::computeSegmentHierarchy() {
 				} while (++fj != facet_it->facet_begin());
 			}
 		}
+
+		for (int i = 0 ; i < SegGraph.nodeCount() ; i++) {
+			for (int j = i + 1; j < SegGraph.nodeCount(); j++) {
+				Polyhedron *poly1 = SegGraph.getNodeAt(i)->segment();
+				Polyhedron *poly2 = SegGraph.getNodeAt(j)->segment();
+
+
+				if (poly1 != NULL && poly2 != NULL && poly1 != poly2) {
+					if (CGAL::Polygon_mesh_processing::do_intersect(*poly1, *poly2) == true) {
+						SegGraph.addConnection(poly1, poly2);
+					}
+				}
+			}
+		}
+
+		int minNodeIndex = -1;
+		do {
+			minNodeIndex = -1;
+			double minZ = DBL_MAX;
+			for (int i = 0 ; i < SegGraph.nodeCount() ; i++) {
+				if (SegGraph.getNodeAt(i)->getFlag() == SEGGRAPH_NOTMARKED) {
+					if (segBBoxArray[i].zmin() < minZ) {
+						minZ = segBBoxArray[i].zmin();
+						minNodeIndex = i;
+					}
+				}
+			}
+			if (minNodeIndex != -1) {
+				SegmentGraph::SegmentNode *n = SegGraph.getNodeAt(minNodeIndex);
+				if (n != NULL) {
+					n->setFlag(SEGGRAPH_VISITED);
+					SegGraph.addHRoot(n);
+
+					std::stack<SegmentGraph::SegmentNode*> nodeStack;
+					nodeStack.push(n);
+
+					while (nodeStack.empty() == false) {
+						SegmentGraph::SegmentNode *node = nodeStack.top();
+						nodeStack.pop();
+						std::vector<SegmentGraph::SegmentNode*> connectedNodes = SegGraph.getConnectedNodes(node);
+						for (int i = 0 ; i < (int)connectedNodes.size() ; i++) {
+							if (connectedNodes[i]->getFlag() == SEGGRAPH_NOTMARKED) {
+								connectedNodes[i]->setFlag(SEGGRAPH_VISITED);
+								node->appendChild(connectedNodes[i]);
+								nodeStack.push(connectedNodes[i]);
+							}
+						}
+					}
+				}
+			}
+		} while (minNodeIndex != -1);
+
+		ret = EXIT_SUCCESS;
 	}
-	return 0;
+	return ret;
+}
+
+
+
+
+
+/* ---------------------------------------------------------------------------------------------------------- */
+
+
+SegmentGraph::SegmentNode::SegmentNode() {
+	mFlag = 0;
+	pSegment = NULL;
+	mChildList.clear();
+}
+
+SegmentGraph::SegmentNode::SegmentNode(Polyhedron *_seg) {
+	mFlag = 0;
+	pSegment = _seg;
+	mChildList.clear();
+}
+
+
+SegmentGraph::SegmentNode::~SegmentNode() {
+	mChildList.clear();
+}
+
+
+Polyhedron* SegmentGraph::SegmentNode::segment() const {
+	return pSegment;
+}
+
+void SegmentGraph::SegmentNode::segment(Polyhedron* _seg) {
+	pSegment = _seg;
+}
+
+int SegmentGraph::SegmentNode::childCount() const {
+	return (int)mChildList.size();
+}
+
+SegmentGraph::SegmentNode* SegmentGraph::SegmentNode::getChildAt(int _index) const {
+	SegmentNode *ret = NULL;
+	if (_index >= 0 && _index < mChildList.size()) {
+		ret = mChildList[_index];
+	}
+	return ret;
+}
+
+void SegmentGraph::SegmentNode::appendChild(SegmentGraph::SegmentNode* _node) {
+	mChildList.push_back(_node);
+}
+
+
+void SegmentGraph::SegmentNode::insertChildAfter(SegmentGraph::SegmentNode* _node, int _index) {
+	if (_index >= 0 && _index < mChildList.size()) {
+		if (_index + 1 < mChildList.size()) {
+			mChildList.insert(mChildList.begin() + _index + 1, _node);
+		}
+		else {
+			mChildList.push_back(_node);
+		}
+	}
+}
+
+
+
+SegmentGraph::SegmentNode* SegmentGraph::SegmentNode::removeChildAt(int _index) {
+	SegmentNode *ret = NULL;
+	if (_index >= 0 && _index < mChildList.size()) {
+		ret = mChildList[_index];
+		mChildList.erase(mChildList.begin() + _index);
+	}
+	return ret;
+}
+
+
+void SegmentGraph::SegmentNode::clearChildList() {
+	mChildList.clear();
+}
+
+
+int SegmentGraph::SegmentNode::getFlag() const {
+	return mFlag;
+}
+
+
+void SegmentGraph::SegmentNode::setFlag(int _flag) {
+	mFlag = _flag;
+}
+
+
+/* ---------------------------------------------------------------------------------------------------------- */
+
+
+
+SegmentGraph::SegmentGraph() {
+	mNodeList.clear();
+	mEdgeList.clear();
+	mHRootList.clear();
+}
+
+
+SegmentGraph::~SegmentGraph() {
+	clear();
+}
+
+
+
+void SegmentGraph::addSegment(Polyhedron *_seg) {
+	SegmentGraph::SegmentNode *node = new SegmentGraph::SegmentNode(_seg);
+	mNodeList.push_back(node);
+}
+
+
+SegmentGraph::SegmentNode* SegmentGraph::getNodeWithSegment(Polyhedron *_seg) const {
+	SegmentGraph::SegmentNode *ret = NULL;
+	for (int i = 0; i < (int)mNodeList.size() && ret == NULL; i++) {
+		if (mNodeList[i]->segment() == _seg) {
+			ret = mNodeList[i];
+		}
+	}
+	return ret;
+}
+
+
+void SegmentGraph::addConnection(Polyhedron *_seg1, Polyhedron *_seg2) {
+	SegmentGraph::SegmentNode *n1 = getNodeWithSegment(_seg1);
+	SegmentGraph::SegmentNode *n2 = getNodeWithSegment(_seg2);
+	if (n1 != NULL && n2 != NULL) {
+		mEdgeList.push_back(std::pair<SegmentGraph::SegmentNode*, SegmentGraph::SegmentNode*>(n1, n2));
+	}
+}
+
+void SegmentGraph::addChild(Polyhedron *_father, Polyhedron *_child) {
+	SegmentGraph::SegmentNode *fatherNode = getNodeWithSegment(_father);
+	SegmentGraph::SegmentNode *childNode = getNodeWithSegment(_child);
+	if (fatherNode != NULL && childNode != NULL) {
+		fatherNode->appendChild(childNode);
+	}
+}
+
+
+void SegmentGraph::addChild(SegmentGraph::SegmentNode *_father, SegmentGraph::SegmentNode *_child) {
+	if (_father != NULL && _child != NULL) {
+		_father->appendChild(_child);
+	}
+}
+
+
+void SegmentGraph::addHRoot(Polyhedron *_seg) {
+	SegmentGraph::SegmentNode *n = getNodeWithSegment(_seg);
+	if (n != NULL) {
+		mHRootList.push_back(n);
+	}
+}
+
+void SegmentGraph::addHRoot(SegmentGraph::SegmentNode *_node) {
+	if (_node != NULL) {
+		mHRootList.push_back(_node);
+	}
+}
+
+
+void SegmentGraph::clear() {
+	for (int i = 0; i < (int)mNodeList.size(); i++) {
+		if (mNodeList[i] != NULL) {
+			delete mNodeList[i];
+		}
+	}
+	mNodeList.clear();
+	mEdgeList.clear();
+	mHRootList.clear();
+}
+
+
+int SegmentGraph::nodeCount() const {
+	return (int)mNodeList.size();
+}
+
+
+SegmentGraph::SegmentNode* SegmentGraph::getNodeAt(int _index) const {
+	SegmentNode *ret = NULL;
+	if (_index >= 0 && _index < mNodeList.size()) {
+		ret = mNodeList[_index];
+	}
+	return ret;
+}
+
+
+std::vector<SegmentGraph::SegmentNode*> SegmentGraph::getConnectedNodes(SegmentGraph::SegmentNode *_node) const {
+	std::vector<SegmentGraph::SegmentNode*> ret;
+	for (int i = 0 ; i < (int)mEdgeList.size() ; i++) {
+		if (mEdgeList[i].first == _node) {
+			ret.push_back(mEdgeList[i].second);
+		}
+		else if (mEdgeList[i].second == _node) {
+			ret.push_back(mEdgeList[i].first);
+		}
+	}
+	return ret;
+}
+
+
+SegmentGraph::SegmentNode* SegmentGraph::getHRootAt(int _index) const {
+	SegmentNode *ret = NULL;
+	if (_index >= 0 && _index < mHRootList.size()) {
+		ret = mHRootList[_index];
+	}
+	return ret;
+}
+
+
+int SegmentGraph::hRootCount() const {
+	return (int)mHRootList.size();
 }
