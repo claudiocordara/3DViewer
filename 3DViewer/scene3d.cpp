@@ -7,6 +7,15 @@
 #include "functions.h"
 #include "mainwindow.h"
 
+
+
+//#include <CGAL/Simple_cartesian.h>
+//#include <CGAL/Surface_mesh.h>
+//#include <CGAL/boost/graph/graph_traits_Surface_mesh.h>
+#include <CGAL/subdivision_method_3.h>
+
+
+
 // define the most used CGAL types
 typedef CGAL::Mean_curvature_flow_skeletonization<Polyhedron>			Skeletonization;
 typedef Skeletonization::Skeleton										Skeleton;
@@ -21,6 +30,8 @@ typedef CGAL::AABB_face_graph_triangle_primitive<Polyhedron> Primitive;
 typedef CGAL::AABB_traits<K, Primitive> Traits;
 typedef CGAL::AABB_tree<Traits> Tree;
 typedef K::Segment_3 Segment;
+
+
 
 // Initiation of Scene3D object
 Scene3D::Scene3D(MainWindow* parent) : QGLWidget(parent)
