@@ -7,7 +7,7 @@
 #include "scene3d.h"
 #include "functions.h"
 
-//#define ENABLE_TEST
+#define ENABLE_TEST
 
 // The MainWindow class to visualization of 3D-objects and their processing control
 MainWindow::MainWindow()
